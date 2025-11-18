@@ -3,17 +3,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Settings, Users, Shield, Database, Bell, Globe, Palette } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const SettingsPage: React.FC = () => {
+  const { t } = useLanguage();
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Settings</h1>
+          <h1 className="text-3xl font-bold">{t('settings.title')}</h1>
           <p className="text-muted-foreground">Configure system settings and preferences</p>
         </div>
         <Button>
-          Save Changes
+          {t('settings.saveChanges')}
         </Button>
       </div>
 
@@ -23,15 +26,15 @@ const SettingsPage: React.FC = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users className="w-5 h-5 text-blue-600" />
-              User Management
+              {t('settings.userManagement')}
             </CardTitle>
             <CardDescription>
-              Manage users, roles, and access permissions
+              {t('settings.manageUsersRolesAccessPermissions')}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Button variant="outline" className="w-full">
-              Manage Users
+              {t('settings.manageUsers')}
             </Button>
           </CardContent>
         </Card>
@@ -40,15 +43,15 @@ const SettingsPage: React.FC = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Shield className="w-5 h-5 text-green-600" />
-              Security Settings
+              {t('settings.securitySettings')}
             </CardTitle>
             <CardDescription>
-              Configure authentication, passwords, and security policies
+              {t('settings.configureAuthenticationPasswordsSecurityPolicies')}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Button variant="outline" className="w-full">
-              Security Settings
+              {t('settings.securitySettings')}
             </Button>
           </CardContent>
         </Card>
@@ -57,15 +60,15 @@ const SettingsPage: React.FC = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Database className="w-5 h-5 text-purple-600" />
-              Data Management
+              {t('settings.dataManagement')}
             </CardTitle>
             <CardDescription>
-              Database settings, backup, and data retention policies
+              {t('settings.databaseSettingsBackupDataRetentionPolicies')}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Button variant="outline" className="w-full">
-              Data Settings
+              {t('settings.dataSettings')}
             </Button>
           </CardContent>
         </Card>
@@ -74,15 +77,15 @@ const SettingsPage: React.FC = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Bell className="w-5 h-5 text-orange-600" />
-              Notifications
+              {t('settings.notifications')}
             </CardTitle>
             <CardDescription>
-              Configure alerts, email notifications, and reminders
+              {t('settings.configureAlertsEmailNotificationsReminders')}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Button variant="outline" className="w-full">
-              Notification Settings
+              {t('settings.notificationSettings')}
             </Button>
           </CardContent>
         </Card>
@@ -91,15 +94,15 @@ const SettingsPage: React.FC = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Globe className="w-5 h-5 text-cyan-600" />
-              System Configuration
+              {t('settings.systemSettings')}
             </CardTitle>
             <CardDescription>
-              Regional settings, language, and system preferences
+              {t('settings.regionalSettingsLanguageSystemPreferences')}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Button variant="outline" className="w-full">
-              System Settings
+              {t('settings.systemSettings')}
             </Button>
           </CardContent>
         </Card>
@@ -108,15 +111,15 @@ const SettingsPage: React.FC = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Palette className="w-5 h-5 text-pink-600" />
-              Appearance
+              {t('settings.appearance')}
             </CardTitle>
             <CardDescription>
-              Theme, colors, and display preferences
+              {t('settings.themeColorsDisplayPreferences')}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Button variant="outline" className="w-full">
-              Appearance Settings
+              {t('settings.appearanceSettings')}
             </Button>
           </CardContent>
         </Card>
@@ -125,7 +128,7 @@ const SettingsPage: React.FC = () => {
       <Alert>
         <Settings className="h-4 w-4" />
         <AlertDescription>
-          Settings functionality will be available in the next update. This will include user management, security configuration, system preferences, and advanced customization options.
+          {t('settings.settingsFunctionalityNextUpdate')}
         </AlertDescription>
       </Alert>
     </div>

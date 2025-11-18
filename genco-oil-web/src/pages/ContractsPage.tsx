@@ -12,8 +12,10 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { mockContracts } from '@/data/mockContracts';
 import type { Contract, ContractStatus, ContractType } from '@/types/contract';
 import { Plus, Search, Eye, Edit, FileText, Calendar, TrendingUp, AlertTriangle, CheckCircle, Clock, Users } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const ContractsPage: React.FC = () => {
+  const { t } = useLanguage();
   const [contracts] = useState<Contract[]>(mockContracts);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<string>('all');

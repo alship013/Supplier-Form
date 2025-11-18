@@ -6,6 +6,10 @@ export default {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ["var(--font-inter)"],
+        inter: ["var(--font-inter)"],
+      },
       colors: {
         primary: {
           50: '#f0f9f4',

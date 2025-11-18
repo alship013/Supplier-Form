@@ -23,8 +23,10 @@ import type {
   ProcessingBatch
 } from '@/types';
 import { Plus, Search, Eye, CheckCircle, XCircle, Clock, MapPin, Calendar, TrendingUp, AlertCircle, Camera, FileText, Truck, Package, Factory, Warehouse } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const FieldOperationsPage: React.FC = () => {
+  const { t } = useLanguage();
   const [deliveries, setDeliveries] = useState<FeedstockRecord[]>(mockFeedstockRecords);
   const [inventory] = useState<FeedstockInventory[]>(mockFeedstockInventory);
   const [qualityInspections] = useState<QualityInspection[]>(mockQualityInspections);
@@ -1056,14 +1058,14 @@ const TrackDeliveryDialog = () => (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Feedstock Management</h1>
-          <p className="text-muted-foreground">Track, manage, and process feedstock from suppliers</p>
+          <h1 className="text-3xl font-bold">{t('fieldOperations.title')}</h1>
+          <p className="text-muted-foreground">{t('fieldOperations.subtitle')}</p>
         </div>
         <Dialog open={isTrackDeliveryOpen} onOpenChange={setIsTrackDeliveryOpen}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="w-4 h-4 mr-2" />
-              New Delivery
+              {t('fieldOperations.newDelivery')}
             </Button>
           </DialogTrigger>
           <TrackDeliveryDialog />
@@ -1074,23 +1076,23 @@ const TrackDeliveryDialog = () => (
         <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="deliveries" className="flex items-center gap-2">
             <Truck className="w-4 h-4" />
-            Deliveries
+            {t('fieldOperations.deliveries')}
           </TabsTrigger>
           <TabsTrigger value="inventory" className="flex items-center gap-2">
             <Warehouse className="w-4 h-4" />
-            Inventory
+            {t('fieldOperations.inventory')}
           </TabsTrigger>
           <TabsTrigger value="processing" className="flex items-center gap-2">
             <Factory className="w-4 h-4" />
-            Processing
+            {t('fieldOperations.processing')}
           </TabsTrigger>
           <TabsTrigger value="quality" className="flex items-center gap-2">
             <CheckCircle className="w-4 h-4" />
-            Quality Control
+            {t('fieldOperations.qualityControl')}
           </TabsTrigger>
           <TabsTrigger value="analytics" className="flex items-center gap-2">
             <TrendingUp className="w-4 h-4" />
-            Analytics
+            {t('fieldOperations.analytics')}
           </TabsTrigger>
         </TabsList>
 
@@ -1100,7 +1102,7 @@ const TrackDeliveryDialog = () => (
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Deliveries</p>
+                <p className="text-sm font-medium text-muted-foreground">{t('fieldOperations.totalDeliveries')}</p>
                 <p className="text-2xl font-bold">{deliveries.length}</p>
               </div>
               <Truck className="w-8 h-8 text-blue-600" />
@@ -1111,7 +1113,7 @@ const TrackDeliveryDialog = () => (
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Pending</p>
+                <p className="text-sm font-medium text-muted-foreground">{t('fieldOperations.pending')}</p>
                 <p className="text-2xl font-bold">
                   {deliveries.filter(d => d.status === 'pending').length}
                 </p>
@@ -1124,7 +1126,7 @@ const TrackDeliveryDialog = () => (
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Approved</p>
+                <p className="text-sm font-medium text-muted-foreground">{t('fieldOperations.approved')}</p>
                 <p className="text-2xl font-bold">
                   {deliveries.filter(d => d.status === 'approved').length}
                 </p>
@@ -1137,7 +1139,7 @@ const TrackDeliveryDialog = () => (
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Volume</p>
+                <p className="text-sm font-medium text-muted-foreground">{t('fieldOperations.totalVolume')}</p>
                 <p className="text-2xl font-bold">
                   {deliveries.reduce((sum, d) => sum + d.volume, 0).toLocaleString()}
                 </p>
@@ -1152,7 +1154,7 @@ const TrackDeliveryDialog = () => (
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
           <Input
-            placeholder="Search deliveries..."
+            placeholder={t('fieldOperations.searchDeliveries')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
@@ -1160,12 +1162,12 @@ const TrackDeliveryDialog = () => (
         </div>
         <Select value={filterStatus} onValueChange={(value: any) => setFilterStatus(value)}>
           <SelectTrigger className="w-[150px]">
-            <SelectValue placeholder="Status" />
+            <SelectValue placeholder={t('fieldOperations.status')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="approved">Approved</SelectItem>
+            <SelectItem value="all">{t('fieldOperations.allStatus')}</SelectItem>
+            <SelectItem value="pending">{t('fieldOperations.pending')}</SelectItem>
+            <SelectItem value="approved">{t('fieldOperations.approved')}</SelectItem>
             <SelectItem value="rejected">Rejected</SelectItem>
             <SelectItem value="in_transit">In Transit</SelectItem>
             <SelectItem value="quality_check">Quality Check</SelectItem>
@@ -1174,10 +1176,10 @@ const TrackDeliveryDialog = () => (
         </Select>
         <Select value={filterFeedstockType} onValueChange={setFilterFeedstockType}>
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Feedstock Type" />
+            <SelectValue placeholder={t('fieldOperations.feedstockType')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
+            <SelectItem value="all">{t('fieldOperations.allTypes')}</SelectItem>
             <SelectItem value="palm_kernel_shell">Palm Kernel Shell</SelectItem>
             <SelectItem value="empty_fruit_bunch">Empty Fruit Bunch</SelectItem>
             <SelectItem value="mesocarp_fiber">Mesocarp Fiber</SelectItem>
@@ -1190,9 +1192,9 @@ const TrackDeliveryDialog = () => (
 
       <Card>
         <CardHeader>
-          <CardTitle>Delivery Tracking</CardTitle>
+          <CardTitle>{t('fieldOperations.deliveryTracking')}</CardTitle>
           <CardDescription>
-            {filteredDeliveries.length} {filteredDeliveries.length === 1 ? 'delivery' : 'deliveries'} found
+            {filteredDeliveries.length} {filteredDeliveries.length === 1 ? 'delivery' : 'deliveries'} {t('fieldOperations.found')}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -1331,9 +1333,9 @@ const TrackDeliveryDialog = () => (
 
           <Card>
             <CardHeader>
-              <CardTitle>Inventory Overview</CardTitle>
+              <CardTitle>{t('fieldOperations.inventoryOverview')}</CardTitle>
               <CardDescription>
-                Current feedstock inventory across all storage facilities
+                {t('fieldOperations.currentFeedstockInventory')}
               </CardDescription>
             </CardHeader>
             <CardContent>

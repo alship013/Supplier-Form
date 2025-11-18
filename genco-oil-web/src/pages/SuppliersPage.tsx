@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,32 +7,58 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { mockSuppliers } from '@/data/mockData';
-import type { Supplier } from '@/types';
-import { Plus, Search, Edit, Eye, MapPin, Mail, Phone, Calendar, TrendingUp, FileText, ClipboardList, FileSignature } from 'lucide-react';
+import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Plus, Search, Edit, Eye, MapPin, Mail, Phone, Calendar, TrendingUp, FileText, FileSignature, Trash2 } from 'lucide-react';
 import SupplierSurveyForm from '@/components/SupplierSurveyForm';
 import ContractCreationForm from '@/components/ContractCreationForm';
+import { supplierDb, type SupplierData } from '@/services/supplierDatabase';
 import { mockContracts } from '@/data/mockContracts';
 import { ContractStatus, ContractType } from '@/types/contract';
+import { useLanguage } from '@/contexts/LanguageContext';
+
+// Utility function to safely render values and prevent React object rendering errors
+const safeRender = (value: any, fallback: string = ''): string => {
+  if (value === null || value === undefined) {
+    return fallback;
+  }
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (typeof value === 'number') {
+    return value.toString();
+  }
+  // If it's an object or anything else, return fallback to prevent React rendering errors
+  return fallback;
+};
 
 const SuppliersPage: React.FC = () => {
-  const [suppliers] = useState<Supplier[]>(mockSuppliers);
+  const { t } = useLanguage();
+  const navigate = useNavigate();
+  const [suppliers, setSuppliers] = useState<SupplierData[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'supplier' | 'farmer'>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive' | 'pending'>('all');
-  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [isSurveyFormOpen, setIsSurveyFormOpen] = useState(false);
   const [isContractFormOpen, setIsContractFormOpen] = useState(false);
-  const [selectedSupplierForContract, setSelectedSupplierForContract] = useState<Supplier | null>(null);
+  const [selectedSupplierForContract, setSelectedSupplierForContract] = useState<SupplierData | null>(null);
+  const [isUnifiedFormOpen, setIsUnifiedFormOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [supplierToDelete, setSupplierToDelete] = useState<SupplierData | null>(null);
 
-  const filteredSuppliers = suppliers.filter(supplier => {
-    const matchesSearch = supplier.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         supplier.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType = filterType === 'all' || supplier.type === filterType;
-    const matchesStatus = filterStatus === 'all' || supplier.status === filterStatus;
+  // Load suppliers from database
+  useEffect(() => {
+    loadSuppliers();
+  }, []);
 
-    return matchesSearch && matchesType && matchesStatus;
+  const loadSuppliers = () => {
+    const allSuppliers = supplierDb.getAllSuppliers();
+    setSuppliers(allSuppliers);
+  };
+
+  const filteredSuppliers = supplierDb.filterSuppliers({
+    search: searchTerm,
+    type: filterType,
+    status: filterStatus
   });
 
   const getStatusBadge = (status: string) => {
@@ -40,11 +67,20 @@ const SuppliersPage: React.FC = () => {
       inactive: 'secondary',
       pending: 'outline'
     };
-    return <Badge variant={variants[status] || 'outline'}>{status}</Badge>;
+    const statusText = {
+      active: t('suppliers.active'),
+      inactive: t('suppliers.inactive'),
+      pending: t('suppliers.pending')
+    };
+    return <Badge variant={variants[status] || 'outline'}>{statusText[status as keyof typeof statusText] || status}</Badge>;
   };
 
   const getTypeBadge = (type: string) => {
-    return <Badge variant={type === 'supplier' ? 'default' : 'secondary'}>{type}</Badge>;
+    const typeText = {
+      supplier: t('suppliers.supplier'),
+      farmer: t('suppliers.farmer')
+    };
+    return <Badge variant={type === 'supplier' ? 'default' : 'secondary'}>{typeText[type as keyof typeof typeText] || type}</Badge>;
   };
 
   const getContractStatusBadge = (status: ContractStatus) => {
@@ -67,219 +103,77 @@ const SuppliersPage: React.FC = () => {
     return mockContracts.filter(contract => contract.supplierId === supplierId);
   };
 
-  const SupplierDetailsDialog = ({ supplier }: { supplier: Supplier }) => (
-    <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-      <DialogHeader>
-        <DialogTitle className="flex items-center gap-2">
-          {supplier.name}
-          {getTypeBadge(supplier.type)}
-          {getStatusBadge(supplier.status)}
-        </DialogTitle>
-        <DialogDescription>
-          Supplier and farmer details and performance metrics
-        </DialogDescription>
-      </DialogHeader>
+  // CRUD Functions
+  const handleAddSupplier = () => {
+    setIsUnifiedFormOpen(true);
+  };
 
-      <div className="grid grid-cols-2 gap-4">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm">Contact Information</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="flex items-center gap-2 text-sm">
-              <Mail className="w-4 h-4 text-muted-foreground" />
-              {supplier.email}
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <Phone className="w-4 h-4 text-muted-foreground" />
-              {supplier.phone}
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <MapPin className="w-4 h-4 text-muted-foreground" />
-              {supplier.location.address}
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <Calendar className="w-4 h-4 text-muted-foreground" />
-              Registered: {new Date(supplier.registrationDate).toLocaleDateString()}
-            </div>
-          </CardContent>
-        </Card>
+  const handleViewSupplier = (supplier: SupplierData) => {
+    navigate(`/suppliers/${supplier.id}`);
+  };
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm">Performance Metrics</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span>Reliability:</span>
-              <span className="font-medium">{supplier.performance.reliability}%</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span>Quality:</span>
-              <span className="font-medium">{supplier.performance.quality}%</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span>Delivery:</span>
-              <span className="font-medium">{supplier.performance.delivery}%</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span>Avg Quality:</span>
-              <span className="font-medium">{supplier.averageQuality}%</span>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+  const handleEditSupplier = (supplier: SupplierData) => {
+    navigate(`/suppliers/edit/${supplier.id}`);
+  };
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <TrendingUp className="w-4 h-4" />
-            Volume & Compliance
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-3 gap-4">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-primary-600">
-              {(supplier.totalVolume / 1000).toFixed(1)}K
-            </div>
-            <div className="text-sm text-muted-foreground">Total Volume (tons)</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-primary-600">
-              {supplier.contracts.length}
-            </div>
-            <div className="text-sm text-muted-foreground">Active Contracts</div>
-          </div>
-          <div className="text-center">
-            <div className={`text-2xl font-bold ${
-              supplier.complianceStatus === 'compliant' ? 'text-green-600' :
-              supplier.complianceStatus === 'non-compliant' ? 'text-red-600' : 'text-yellow-600'
-            }`}>
-              {supplier.feedstockHistory.length}
-            </div>
-            <div className="text-sm text-muted-foreground">Total Deliveries</div>
-          </div>
-        </CardContent>
-      </Card>
+  const handleDeleteSupplier = (supplier: SupplierData) => {
+    setSupplierToDelete(supplier);
+    setDeleteDialogOpen(true);
+  };
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm flex items-center gap-2">
-            <FileSignature className="w-4 h-4" />
-            Contracts
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {getSupplierContracts(supplier.id).length > 0 ? (
-            <div className="space-y-3">
-              {getSupplierContracts(supplier.id).map((contract) => (
-                <div key={contract.id} className="flex items-center justify-between p-3 border rounded">
-                  <div>
-                    <p className="font-medium">{contract.contractNumber}</p>
-                    <p className="text-sm text-muted-foreground truncate" title={contract.title}>
-                      {contract.title}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(contract.startDate).toLocaleDateString()} - {new Date(contract.endDate).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    {getContractStatusBadge(contract.status)}
-                    <p className="text-sm font-medium mt-1">
-                      {(contract.value / 1000000).toFixed(1)}M {contract.currency}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-6 text-muted-foreground">
-              <FileSignature className="w-8 h-8 mx-auto mb-2 opacity-50" />
-              <p className="text-sm">No contracts found</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+  const confirmDelete = () => {
+    if (supplierToDelete) {
+      supplierDb.deleteSupplier(supplierToDelete.id);
+      loadSuppliers();
+      setDeleteDialogOpen(false);
+      setSupplierToDelete(null);
+    }
+  };
 
-      <DialogFooter>
-        <Button variant="outline" onClick={() => setSelectedSupplier(null)}>
-          Close
-        </Button>
-        <Button
-          onClick={() => {
-            setSelectedSupplierForContract(supplier);
-            setIsContractFormOpen(true);
-            setSelectedSupplier(null);
-          }}
-          variant="outline"
-        >
-          <FileSignature className="w-4 h-4 mr-2" />
-          Create Contract
-        </Button>
-        <Button>
-          <Edit className="w-4 h-4 mr-2" />
-          Edit Supplier
-        </Button>
-      </DialogFooter>
-    </DialogContent>
-  );
+  const handleCreateContract = (supplier: SupplierData) => {
+    setSelectedSupplierForContract(supplier);
+    setIsContractFormOpen(true);
+  };
 
+  const handleSaveSupplier = (supplier: SupplierData) => {
+    loadSuppliers();
+    setIsUnifiedFormOpen(false);
+    // Navigate to supplier detail page after creating
+    if (!supplier.id) {
+      // Find the newly created supplier
+      const newSupplier = supplierDb.getAllSuppliers().find(s => s.formId === supplier.formId);
+      if (newSupplier) {
+        navigate(`/suppliers/${newSupplier.id}`);
+      }
+    }
+  };
+
+  const handleCancelSupplier = () => {
+    setIsUnifiedFormOpen(false);
+  };
+
+  
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Suppliers & Farmers</h1>
+          <h1 className="text-3xl font-bold">{t('suppliers.title')}</h1>
           <p className="text-muted-foreground">Manage your supplier and farmer network</p>
         </div>
         <div className="flex gap-2">
-          <Dialog open={isSurveyFormOpen} onOpenChange={setIsSurveyFormOpen}>
+          <Dialog open={isUnifiedFormOpen} onOpenChange={setIsUnifiedFormOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline">
-                <FileText className="w-4 h-4 mr-2" />
-                Survey Form
+              <Button onClick={handleAddSupplier}>
+                <Plus className="w-4 h-4 mr-2" />
+                Add Suppliers
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto">
-              <DialogTitle className="text-xl">Supplier Survey Form</DialogTitle>
-              <SupplierSurveyForm />
-            </DialogContent>
-          </Dialog>
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="w-4 h-4 mr-2" />
-                Add New
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add New Supplier/Farmer</DialogTitle>
-                <DialogDescription>
-                  Register a new supplier or farmer in the system
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <label htmlFor="name" className="text-right">Name</label>
-                  <Input id="name" className="col-span-3" placeholder="Enter name" />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <label htmlFor="email" className="text-right">Email</label>
-                  <Input id="email" type="email" className="col-span-3" placeholder="Enter email" />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <label htmlFor="phone" className="text-right">Phone</label>
-                  <Input id="phone" className="col-span-3" placeholder="Enter phone number" />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={() => setIsAddDialogOpen(false)}>
-                  Add Supplier
-                </Button>
-              </DialogFooter>
+              <DialogTitle className="text-xl">Add New Supplier with Comprehensive Survey</DialogTitle>
+              <SupplierSurveyForm
+                onSave={handleSaveSupplier}
+                onCancel={handleCancelSupplier}
+              />
             </DialogContent>
           </Dialog>
         </div>
@@ -329,53 +223,49 @@ const SuppliersPage: React.FC = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
+                <TableHead>Supplier Name</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Contact</TableHead>
                 <TableHead>Location</TableHead>
-                <TableHead>Total Volume</TableHead>
-                <TableHead>Performance</TableHead>
+                <TableHead>Land Info</TableHead>
+                <TableHead>Survey Status</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredSuppliers.map((supplier) => (
                 <TableRow key={supplier.id}>
-                  <TableCell className="font-medium">{supplier.name}</TableCell>
+                  <TableCell className="font-medium">{safeRender(supplier.supplierName, 'Invalid supplier name')}</TableCell>
                   <TableCell>{getTypeBadge(supplier.type)}</TableCell>
                   <TableCell>{getStatusBadge(supplier.status)}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    <div>{supplier.email}</div>
-                    <div>{supplier.phone}</div>
+                    <div>{safeRender(supplier.email, 'Invalid email')}</div>
+                    <div>{safeRender(supplier.phoneNumber, 'Invalid phone')}</div>
                   </TableCell>
                   <TableCell className="text-sm">
-                    <div>{supplier.location.address}</div>
-                    <div className="text-muted-foreground">{supplier.location.region}</div>
+                    <div>{safeRender(supplier.plantationAddress, 'Invalid address')}</div>
+                    <div className="text-muted-foreground">GPS: {safeRender(supplier.gpsCoordinate, 'N/A')}</div>
                   </TableCell>
                   <TableCell>
-                    <div className="font-medium">{(supplier.totalVolume / 1000).toFixed(1)}K tons</div>
-                    <div className="text-sm text-muted-foreground">Quality: {supplier.averageQuality}%</div>
+                    <div className="font-medium">{(typeof supplier.totalLandSize === 'number' ? supplier.totalLandSize.toLocaleString('en-US') : '0')} Ha</div>
+                    <div className="text-sm text-muted-foreground">Crop: {safeRender(supplier.mainCropType, 'N/A')}</div>
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-1 text-sm">
                       <div className="flex items-center gap-1">
-                        <span className="w-12">Rel:</span>
+                        <span className="w-12">Survey:</span>
                         <span className={`font-medium ${
-                          supplier.performance.reliability >= 90 ? 'text-green-600' :
-                          supplier.performance.reliability >= 80 ? 'text-yellow-600' : 'text-red-600'
+                          supplier.hasDeforestation === 'no' ? 'text-green-600' :
+                          supplier.hasDeforestation === 'yes' ? 'text-red-600' : 'text-yellow-600'
                         }`}>
-                          {supplier.performance.reliability}%
+                          {supplier.hasDeforestation === 'no' ? 'Clear' :
+                           supplier.hasDeforestation === 'yes' ? 'Risk' : 'Unknown'}
                         </span>
                       </div>
                       <div className="flex items-center gap-1">
-                        <span className="w-12">Qual:</span>
-                        <span className={`font-medium ${
-                          supplier.performance.quality >= 90 ? 'text-green-600' :
-                          supplier.performance.quality >= 80 ? 'text-yellow-600' : 'text-red-600'
-                        }`}>
-                          {supplier.performance.quality}%
-                        </span>
+                        <span className="w-12">Plots:</span>
+                        <span className="font-medium">{supplier.plots?.length || 0}</span>
                       </div>
                     </div>
                   </TableCell>
@@ -384,29 +274,35 @@ const SuppliersPage: React.FC = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setSelectedSupplier(supplier)}
+                        onClick={() => handleViewSupplier(supplier)}
+                        title="View Details"
                       >
                         <Eye className="w-4 h-4" />
                       </Button>
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => {
-                          setSelectedSupplierForContract(supplier);
-                          setIsContractFormOpen(true);
-                        }}
+                        onClick={() => handleCreateContract(supplier)}
+                        title="Create Contract"
                       >
                         <FileSignature className="w-4 h-4" />
                       </Button>
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setIsSurveyFormOpen(true)}
+                        onClick={() => handleEditSupplier(supplier)}
+                        title="Edit Supplier"
                       >
-                        <ClipboardList className="w-4 h-4" />
-                      </Button>
-                      <Button variant="outline" size="sm">
                         <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDeleteSupplier(supplier)}
+                        className="text-red-600 hover:text-red-700"
+                        title="Delete Supplier"
+                      >
+                        <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>
                   </TableCell>
@@ -417,16 +313,21 @@ const SuppliersPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      {selectedSupplier && (
-        <SupplierDetailsDialog supplier={selectedSupplier} />
-      )}
-
+      {/* Create Contract Dialog */}
       {selectedSupplierForContract && (
         <Dialog open={isContractFormOpen} onOpenChange={setIsContractFormOpen}>
           <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <VisuallyHidden>
+                <DialogTitle>Create Contract</DialogTitle>
+              </VisuallyHidden>
+              <DialogDescription>
+                Create a new contract for {selectedSupplierForContract.supplierName}
+              </DialogDescription>
+            </DialogHeader>
             <ContractCreationForm
               supplierId={selectedSupplierForContract.id}
-              supplierName={selectedSupplierForContract.name}
+              supplierName={selectedSupplierForContract.supplierName}
               onContractCreated={(contract) => {
                 console.log('Contract created:', contract);
                 setIsContractFormOpen(false);
@@ -439,6 +340,28 @@ const SuppliersPage: React.FC = () => {
             />
           </DialogContent>
         </Dialog>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {supplierToDelete && (
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the supplier "{supplierToDelete.supplierName}" and all associated data.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setDeleteDialogOpen(false)}>
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
     </div>
   );

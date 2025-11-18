@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -13,6 +15,7 @@
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 142.1 76.2% 36.3%;
+    --font-inter: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   }
 
   * {
@@ -20,7 +23,10 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-inter);
     font-feature-settings: "rlig" 1, "calt" 1;
+    font-optical-sizing: auto;
+    font-size: 14px; /* Slightly smaller than default 16px */
   }
 }
 
@@ -40,4 +46,19 @@
   .card {
     @apply bg-white rounded-lg shadow-md border border-gray-200;
   }
+}
+
+/* Fix for Radix UI dropdown transparency issues */
+[data-radix-select-content],
+[data-radix-select-item],
+[data-radix-select-viewport],
+[data-radix-select-scroll-up-button],
+[data-radix-select-scroll-down-button] {
+  opacity: 1 !important;
+}
+
+/* Additional fixes for other dropdown/popover components */
+[data-radix-dropdown-menu-content],
+[data-radix-popover-content] {
+  opacity: 1 !important;
 }

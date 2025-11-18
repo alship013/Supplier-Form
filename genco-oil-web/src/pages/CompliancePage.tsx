@@ -23,8 +23,10 @@ import {
   BarChart3,
   FileText
 } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const CompliancePage: React.FC = () => {
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState('overview');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -140,17 +142,17 @@ const CompliancePage: React.FC = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Compliance & Audits</h1>
-          <p className="text-muted-foreground">Monitor regulatory compliance and audit status</p>
+          <h1 className="text-3xl font-bold">{t('compliance.title')}</h1>
+          <p className="text-muted-foreground">{t('compliance.subtitle')}</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline">
             <Download className="w-4 h-4 mr-2" />
-            Export Report
+            {t('compliance.exportReport')}
           </Button>
           <Button>
             <FileCheck className="w-4 h-4 mr-2" />
-            Schedule Audit
+            {t('compliance.scheduleAudit')}
           </Button>
         </div>
       </div>
@@ -161,13 +163,13 @@ const CompliancePage: React.FC = () => {
           <CardHeader className="pb-3">
             <CardTitle className="text-sm flex items-center gap-2">
               <Shield className="w-4 h-4" />
-              Overall Compliance
+              {t('compliance.overallCompliance')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">{complianceMetrics.overallScore}%</div>
             <Progress value={complianceMetrics.overallScore} className="mt-2" />
-            <p className="text-sm text-muted-foreground mt-2">Well above target</p>
+            <p className="text-sm text-muted-foreground mt-2">{t('compliance.wellAboveTarget')}</p>
           </CardContent>
         </Card>
 
@@ -175,13 +177,13 @@ const CompliancePage: React.FC = () => {
           <CardHeader className="pb-3">
             <CardTitle className="text-sm flex items-center gap-2">
               <FileCheck className="w-4 h-4" />
-              EUDR Compliance
+              {t('compliance.eudrCompliance')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">{complianceMetrics.eudrCompliance}%</div>
             <Progress value={complianceMetrics.eudrCompliance} className="mt-2" />
-            <p className="text-sm text-muted-foreground mt-2">Meets requirements</p>
+            <p className="text-sm text-muted-foreground mt-2">{t('compliance.meetsRequirements')}</p>
           </CardContent>
         </Card>
 
@@ -189,13 +191,13 @@ const CompliancePage: React.FC = () => {
           <CardHeader className="pb-3">
             <CardTitle className="text-sm flex items-center gap-2">
               <CheckCircle className="w-4 h-4" />
-              ISCC Compliance
+              {t('compliance.isccCompliance')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-yellow-600">{complianceMetrics.isccCompliance}%</div>
             <Progress value={complianceMetrics.isccCompliance} className="mt-2" />
-            <p className="text-sm text-muted-foreground mt-2">Needs improvement</p>
+            <p className="text-sm text-muted-foreground mt-2">{t('compliance.needsImprovement')}</p>
           </CardContent>
         </Card>
 
@@ -203,13 +205,13 @@ const CompliancePage: React.FC = () => {
           <CardHeader className="pb-3">
             <CardTitle className="text-sm flex items-center gap-2">
               <AlertTriangle className="w-4 h-4" />
-              Open Issues
+              {t('compliance.openIssues')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">{complianceMetrics.openIssues}</div>
             <p className="text-sm text-muted-foreground mt-2">
-              {complianceMetrics.criticalIssues} critical
+              {complianceMetrics.criticalIssues} {t('compliance.critical')}
             </p>
           </CardContent>
         </Card>
@@ -217,10 +219,10 @@ const CompliancePage: React.FC = () => {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="audits">Audits & Assessments</TabsTrigger>
-          <TabsTrigger value="issues">Issues & Actions</TabsTrigger>
-          <TabsTrigger value="documents">Documents</TabsTrigger>
+          <TabsTrigger value="overview">{t('compliance.overview')}</TabsTrigger>
+          <TabsTrigger value="audits">{t('compliance.auditsAssessments')}</TabsTrigger>
+          <TabsTrigger value="issues">{t('compliance.issuesActions')}</TabsTrigger>
+          <TabsTrigger value="documents">{t('compliance.documents')}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -229,7 +231,7 @@ const CompliancePage: React.FC = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <BarChart3 className="w-5 h-5" />
-                  Compliance Score Trends
+                  {t('compliance.complianceScoreTrends')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -409,7 +411,7 @@ const CompliancePage: React.FC = () => {
               <Alert>
                 <Calendar className="h-4 w-4" />
                 <AlertDescription>
-                  Document management functionality will be available in the next update. For now, please contact the compliance team for document requests.
+                  {t('compliance.documentManagementFunctionalityNextUpdate')}
                 </AlertDescription>
               </Alert>
             </CardContent>

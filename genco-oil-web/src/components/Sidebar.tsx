@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { SidebarLanguageSwitcher } from '@/components/SidebarLanguageSwitcher';
 
 interface NavItem {
   id: string;
@@ -23,66 +25,6 @@ interface NavItem {
   href: string;
   badge?: string;
 }
-
-const navItems: NavItem[] = [
-  {
-    id: 'dashboard',
-    label: 'Dashboard',
-    icon: <Home className="w-5 h-5" />,
-    href: '/'
-  },
-  {
-    id: 'suppliers',
-    label: 'Suppliers & Farmers',
-    icon: <Users className="w-5 h-5" />,
-    href: '/suppliers',
-    badge: '12'
-  },
-  {
-    id: 'contracts',
-    label: 'Contracts',
-    icon: <FileSignature className="w-5 h-5" />,
-    href: '/contracts',
-    badge: '3'
-  },
-  {
-    id: 'processing',
-    label: 'Processing & QC',
-    icon: <Package className="w-5 h-5" />,
-    href: '/processing',
-    badge: '5'
-  },
-  {
-    id: 'field-operations',
-    label: 'Field Operations',
-    icon: <Truck className="w-5 h-5" />,
-    href: '/field-operations'
-  },
-  {
-    id: 'compliance',
-    label: 'Compliance',
-    icon: <CheckCircle className="w-5 h-5" />,
-    href: '/compliance'
-  },
-  {
-    id: 'trading',
-    label: 'Trading & Sales',
-    icon: <TrendingUp className="w-5 h-5" />,
-    href: '/trading'
-  },
-  {
-    id: 'reports',
-    label: 'Reports',
-    icon: <FileText className="w-5 h-5" />,
-    href: '/reports'
-  },
-  {
-    id: 'settings',
-    label: 'Settings',
-    icon: <Settings className="w-5 h-5" />,
-    href: '/settings'
-  }
-];
 
 interface SidebarProps {
   activeItem?: string;
@@ -97,6 +39,67 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const location = useLocation();
   const currentPath = location.pathname;
+  const { t } = useLanguage();
+
+  const navItems = [
+    {
+      id: 'dashboard',
+      label: t('sidebar.dashboard'),
+      icon: <Home className="w-5 h-5" />,
+      href: '/'
+    },
+    {
+      id: 'suppliers',
+      label: t('sidebar.suppliers'),
+      icon: <Users className="w-5 h-5" />,
+      href: '/suppliers',
+      badge: '12'
+    },
+    {
+      id: 'contracts',
+      label: t('sidebar.contracts'),
+      icon: <FileSignature className="w-5 h-5" />,
+      href: '/contracts',
+      badge: '3'
+    },
+    {
+      id: 'processing',
+      label: t('sidebar.processing'),
+      icon: <Package className="w-5 h-5" />,
+      href: '/processing',
+      badge: '5'
+    },
+    {
+      id: 'field-operations',
+      label: t('sidebar.fieldOperations'),
+      icon: <Truck className="w-5 h-5" />,
+      href: '/field-operations'
+    },
+    {
+      id: 'compliance',
+      label: t('sidebar.compliance'),
+      icon: <CheckCircle className="w-5 h-5" />,
+      href: '/compliance'
+    },
+    {
+      id: 'trading',
+      label: t('sidebar.trading'),
+      icon: <TrendingUp className="w-5 h-5" />,
+      href: '/trading'
+    },
+    {
+      id: 'reports',
+      label: t('sidebar.reports'),
+      icon: <FileText className="w-5 h-5" />,
+      href: '/reports'
+    },
+    {
+      id: 'settings',
+      label: t('sidebar.settings'),
+      icon: <Settings className="w-5 h-5" />,
+      href: '/settings'
+    }
+  ];
   return (
     <div className={cn(
       "flex flex-col h-screen bg-primary-700 text-white transition-all duration-300",
@@ -112,13 +115,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
             "flex items-center gap-3",
             isCollapsed && "justify-center"
           )}>
-            <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
+            <div className="w-10 h-10 bg-primary-600 rounded-lg flex items-center justify-center">
               <Package className="w-5 h-5 text-white" />
             </div>
             {!isCollapsed && (
               <div>
                 <h1 className="text-lg font-bold">Genco Oil</h1>
-                <p className="text-primary-200 text-xs">Traceability Platform</p>
+                <p className="text-primary-200 text-xs">{t('sidebar.platform')}</p>
               </div>
             )}
           </div>
@@ -168,7 +171,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </nav>
 
       {/* Footer */}
-      <div className="p-4 border-t border-primary-600">
+      <div className="p-4 border-t border-primary-600 space-y-3">
+        {/* Language Switcher */}
+        <SidebarLanguageSwitcher isCollapsed={isCollapsed} />
+
+        {/* Version and Copyright */}
         {!isCollapsed && (
           <div className="text-primary-200 text-xs space-y-1">
             <p>Version 1.0.0</p>
@@ -176,8 +183,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
         {isCollapsed && (
-          <div className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center mx-auto">
-            <Users className="w-4 h-4" />
+          <div className="w-10 h-10 bg-primary-600 rounded-full flex items-center justify-center mx-auto">
+            <Users className="w-5 h-5" />
           </div>
         )}
       </div>

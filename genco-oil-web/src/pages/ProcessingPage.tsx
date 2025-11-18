@@ -12,15 +12,37 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { mockIntakeRecords, mockProcessingBatches, mockQualityTests, mockInventoryRecords, mockProcessingStats } from '@/data/mockProcessingData';
 import { AcceptanceStatus, BatchStatus, TestResult } from '@/types/processing';
 import type { IntakeRecord, ProcessingBatch, QualityTest, InventoryRecord, ProcessingStepType, QualityCheckType } from '@/types/processing';
-import { Plus, Search, Eye, Edit, AlertTriangle, CheckCircle, Clock, Truck, Beaker, Package, Activity, TrendingUp, Filter, Download, Camera, Thermometer } from 'lucide-react';
+import { Plus, Search, Eye, Edit, AlertTriangle, CheckCircle, Clock, Truck, Beaker, Package, Activity, TrendingUp, Filter, Download, Camera, Thermometer, PieChart } from 'lucide-react';
+import { LineChart, Line, PieChart as RechartsPieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const ProcessingPage: React.FC = () => {
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedIntake, setSelectedIntake] = useState<IntakeRecord | null>(null);
   const [selectedBatch, setSelectedBatch] = useState<ProcessingBatch | null>(null);
   const [selectedTest, setSelectedTest] = useState<QualityTest | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
+  
+  const dailyProcessingData = [
+    { date: 'Mon', intake: 2850, processed: 2720, output: 2650 },
+    { date: 'Tue', intake: 3120, processed: 2980, output: 2910 },
+    { date: 'Wed', intake: 2980, processed: 2850, output: 2790 },
+    { date: 'Thu', intake: 3450, processed: 3320, output: 3240 },
+    { date: 'Fri', intake: 3210, processed: 3080, output: 3010 },
+    { date: 'Sat', intake: 1890, processed: 1820, output: 1780 },
+    { date: 'Sun', intake: 950, processed: 920, output: 890 }
+  ];
+
+  const yieldDistributionData = [
+    { name: t('processing.premium'), value: 28, fill: '#16a34a' },
+    { name: t('processing.standard'), value: 52, fill: '#2563eb' },
+    { name: t('processing.commercial'), value: 17, fill: '#ca8a04' },
+    { name: t('processing.lowGrade'), value: 3, fill: '#dc2626' }
+  ];
+
+  
   const getStatusBadge = (status: AcceptanceStatus | BatchStatus | TestResult) => {
     const statusConfig = {
       [AcceptanceStatus.ACCEPTED]: { variant: 'default' as const, color: 'text-green-600' },
@@ -66,31 +88,31 @@ const ProcessingPage: React.FC = () => {
           <div className="grid grid-cols-2 gap-6">
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Supplier & Delivery</CardTitle>
+                <CardTitle className="text-sm">{t('processing.supplierAndDelivery')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-sm">Supplier:</span>
+                  <span className="text-sm">{t('processing.supplier')}:</span>
                   <span className="font-medium">{intake.supplierName}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm">Contract:</span>
+                  <span className="text-sm">{t('processing.contract')}:</span>
                   <span className="font-medium">{intake.contractId || 'N/A'}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm">Vehicle:</span>
+                  <span className="text-sm">{t('processing.vehicle')}:</span>
                   <span className="font-medium">{intake.vehicleNumber}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm">Driver:</span>
+                  <span className="text-sm">{t('processing.driver')}:</span>
                   <span className="font-medium">{intake.driverName}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm">Arrival:</span>
+                  <span className="text-sm">{t('processing.arrival')}:</span>
                   <span className="font-medium">{new Date(intake.arrivalTime).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm">Departure:</span>
+                  <span className="text-sm">{t('processing.departure')}:</span>
                   <span className="font-medium">{new Date(intake.departureTime).toLocaleString()}</span>
                 </div>
               </CardContent>
@@ -98,7 +120,7 @@ const ProcessingPage: React.FC = () => {
 
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Material Details</CardTitle>
+                <CardTitle className="text-sm">{t('processing.materialDetails')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
                 <div className="flex justify-between">
@@ -425,13 +447,76 @@ const ProcessingPage: React.FC = () => {
           </div>
         </TabsContent>
 
+        {/* Processing Charts Section */}
+        <div className="space-y-8">
+          {/* Daily Processing Line Chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="w-5 h-5 text-green-600" />
+                Daily Processing Metrics
+              </CardTitle>
+              <CardDescription>
+                Weekly intake, processing, and output volumes (MT)
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={dailyProcessingData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Line type="monotone" dataKey="intake" stroke="#2563eb" strokeWidth={2} name="Intake" />
+                  <Line type="monotone" dataKey="processed" stroke="#16a34a" strokeWidth={2} name="Processed" />
+                  <Line type="monotone" dataKey="output" stroke="#ca8a04" strokeWidth={2} name="Output" />
+                </LineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* Yield Distribution Pie Chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="w-5 h-5 text-orange-600" />
+                Product Yield Distribution
+              </CardTitle>
+              <CardDescription>
+                Distribution of product quality grades (%)
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <RechartsPieChart>
+                  <Pie
+                    data={yieldDistributionData}
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={100}
+                    fill="#8884d8"
+                    dataKey="value"
+                    label={({ name, value }) => `${name}: ${value}%`}
+                  >
+                    {yieldDistributionData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </RechartsPieChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Intake Tab */}
         <TabsContent value="intake" className="space-y-6">
           <div className="flex gap-4 items-center">
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
               <Input
-                placeholder="Search intake records..."
+                placeholder={t('processing.searchPlaceholder')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"

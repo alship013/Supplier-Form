@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,109 +12,38 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { Progress } from '@/components/ui/progress';
-import { Upload, MapPin, Calendar, FileText, Camera, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Upload, MapPin, Calendar, FileText, Camera, AlertTriangle, CheckCircle, Save, RotateCcw } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { supplierDb, type SupplierData } from '@/services/supplierDatabase';
 const format = (date: Date, fmt: string) => {
   return date.toISOString().split('T')[0]; // Simple date formatting for YYYY-MM-DD
 };
 
-interface PlotData {
-  id: string;
-  identifier: string;
-  size: number;
-  gpsCoordinates: string;
+interface SupplierSurveyFormProps {
+  supplierId?: string; // For editing existing supplier
+  onSave?: (supplier: SupplierData) => void;
+  onCancel?: () => void;
 }
 
-interface SurveyFormData {
-  // Basic Information
-  formId: string;
-  uniqueSupplierId: string;
-  surveyDate: string;
-  supplierName: string;
-  contactPerson: string;
-  phoneNumber: string;
-  email: string;
-  plantationAddress: string;
-  gpsCoordinate: string;
-
-  // Land Status and Legality
-  ownershipType: string;
-  proofOfOwnership: string[];
-  certificateNumber: string;
-  legalStatusOfLand: string;
-  currentBuyer: string;
-  otherOwnershipDetails: string;
-  otherLegalStatusDetails: string;
-
-  // EUDR Compliance
-  hasDeforestation: string;
-  evidenceOfNoDeforestation: string;
-  legalityChecklist: string[];
-  proximityToIndigenous: string;
-  landConflicts: string;
-  harvestDateStart: string;
-  harvestDateEnd: string;
-  firstPointOfSale: string;
-  plots: PlotData[];
-
-  // ISCC Self Assessment
-  isccLandUse: string;
-  previousLandUse: string[];
-  environmentalPractices: string[];
-  healthSafetyChecklist: string[];
-  workerRights: string[];
-  grievanceMechanism: string;
-  freedomOfAssociation: string;
-  recordKeeping: string[];
-  gapTraining: string;
-
-  // Plantation Profile
-  mainCropType: string;
-  plantingYear: number;
-  ageOfTrees: number;
-  totalLandSize: number;
-  estimatedYield: number;
-  soilType: string;
-  topography: string;
-  farmingSystem: string;
-  laborType: string[];
-  permanentWorkers: number;
-  seasonalWorkers: number;
-  roadCondition: string;
-  distance: number;
-  accessCategory: string;
-  waterSource: string;
-  pestControlMethod: string;
-  quantitySpecs: string;
-  fertilizerUse: string;
-  fertilizerUsageType: string;
-  fertilizerBrandDetails: string;
-  fertilizerMonths: string[];
-  costFertilizer: number;
-  costLabor: number;
-  costTransport: number;
-  peakSeasonStart: string;
-  peakSeasonEnd: string;
-  seedCollectionStart: string;
-  seedCollectionEnd: string;
-  fruitDevelopmentStart: string;
-  fruitDevelopmentEnd: string;
-
-  // Review and Submit
-  finalNotes: string;
-  observedRedFlags: string[];
-  recommendedAction: string;
-  reason: string;
-  declaration: boolean;
-  surveyorSignature: string;
-  supplierSignature: string;
-  dateVerified: string;
-}
-
-const SupplierSurveyForm: React.FC = () => {
+const SupplierSurveyForm: React.FC<SupplierSurveyFormProps> = ({ supplierId, onSave, onCancel }) => {
+  const { t } = useLanguage();
   const [currentTab, setCurrentTab] = useState('basic');
-  const [formData, setFormData] = useState<Partial<SurveyFormData>>({
-    formId: `SUP-${Date.now()}`,
-    uniqueSupplierId: `SUP-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
+  // Generate truly unique IDs
+  const generateFormId = () => {
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substr(2, 9).toUpperCase();
+    return `FORM-${timestamp}-${random}`;
+  };
+
+  const generateSupplierId = () => {
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substr(2, 9).toUpperCase();
+    return `SUP-${timestamp}-${random}`;
+  };
+
+  const [formData, setFormData] = useState<Partial<SupplierData>>({
+    formId: generateFormId(),
+    uniqueSupplierId: generateSupplierId(),
     surveyDate: format(new Date(), 'yyyy-MM-dd'),
     dateVerified: format(new Date(), 'yyyy-MM-dd'),
     plots: [{ id: '1', identifier: 'Plot 1', size: 0, gpsCoordinates: '' }],
@@ -130,10 +59,95 @@ const SupplierSurveyForm: React.FC = () => {
   });
 
   const [uploadedFiles, setUploadedFiles] = useState<{[key: string]: File[]}>({});
+  const [lastSaved, setLastSaved] = useState<string>('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout>();
 
-  const updateFormData = (field: keyof SurveyFormData, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  // Utility functions
+  const formatNumber = (num: number): string => {
+    return num.toLocaleString('en-US');
   };
+
+  const parseFormattedNumber = (formatted: string): number => {
+    const unformatted = formatted.replace(/,/g, '');
+    return parseFloat(unformatted) || 0;
+  };
+
+  // Field validation helper
+  const isFieldValid = (field: keyof SupplierData): boolean => {
+    const value = formData[field];
+    if (typeof value === 'string') {
+      return value.trim() !== '';
+    } else if (typeof value === 'boolean') {
+      return value;
+    } else if (Array.isArray(value)) {
+      return value.length > 0;
+    } else if (typeof value === 'number') {
+      return value > 0;
+    }
+    return false;
+  };
+
+  // Get field border class based on validity
+  const getFieldBorderClass = (field: keyof SupplierData): string => {
+    return isFieldValid(field)
+      ? 'border-green-300 focus:border-green-400'
+      : 'border-red-200 focus:border-red-300';
+  };
+
+  // Auto-save functionality
+  const autoSave = useCallback(() => {
+    if (!supplierId) return; // Only auto-save for existing suppliers
+
+    setIsSaving(true);
+    setAutoSaveStatus('saving');
+
+    try {
+      const success = supplierDb.updateSupplier(supplierId, formData as SupplierData);
+      if (success) {
+        setAutoSaveStatus('saved');
+        setLastSaved(new Date().toLocaleTimeString());
+      } else {
+        setAutoSaveStatus('error');
+      }
+    } catch (error) {
+      console.error('Auto-save failed:', error);
+      setAutoSaveStatus('error');
+    } finally {
+      setIsSaving(false);
+    }
+  }, [formData, supplierId]);
+
+  // Update formData with auto-save
+  const updateFormData = (field: keyof SupplierData, value: any) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+
+    // Trigger auto-save for existing suppliers
+    if (supplierId) {
+      // Clear existing timeout
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+
+      // Set new timeout to save after 2 seconds of inactivity
+      autoSaveTimeoutRef.current = setTimeout(() => {
+        autoSave();
+      }, 2000);
+
+      setAutoSaveStatus('idle');
+    }
+  };
+
+  // Load existing supplier data if editing
+  useEffect(() => {
+    if (supplierId) {
+      const supplier = supplierDb.getSupplierById(supplierId);
+      if (supplier) {
+        setFormData(supplier);
+      }
+    }
+  }, [supplierId]);
 
   const addPlot = () => {
     const newPlot: PlotData = {
@@ -205,7 +219,7 @@ const SupplierSurveyForm: React.FC = () => {
     }
   };
 
-  const toggleArrayItem = (field: keyof SurveyFormData, item: string) => {
+  const toggleArrayItem = (field: keyof SupplierData, item: string) => {
     setFormData(prev => {
       const currentArray = (prev[field] as string[]) || [];
       const newArray = currentArray.includes(item)
@@ -216,44 +230,254 @@ const SupplierSurveyForm: React.FC = () => {
   };
 
   const getProgress = () => {
-    const totalSections = 6;
-    const completedSections = [1, 2, 3, 4, 5, 6].filter(num => {
-      const sectionMap: {[key: number]: string} = {
-        1: 'basic',
-        2: 'land',
-        3: 'eudr',
-        4: 'iscc',
-        5: 'plantation',
-        6: 'review'
-      };
-      return currentTab === sectionMap[num] || (num === 1 && currentTab === 'basic');
-    }).length;
-    return (completedSections / totalSections) * 100;
+    // Define required fields for each section
+    const basicFields = [
+      'supplierName', 'contactPerson', 'phoneNumber', 'email', 'plantationAddress'
+    ];
+
+    const landFields = [
+      'ownershipType', 'legalStatusOfLand'
+    ];
+
+    const eudrFields = [
+      'hasDeforestation'
+    ];
+
+    const isccFields = [
+      'isccLandUse'
+    ];
+
+    const plantationFields = [
+      'mainCropType', 'totalLandSize'
+    ];
+
+    const reviewFields = [
+      'declaration', 'surveyorSignature', 'supplierSignature', 'dateVerified'
+    ];
+
+    // Count filled fields in each section
+    const getSectionProgress = (fields: string[]) => {
+      const filledCount = fields.filter(field => {
+        const value = formData[field as keyof SupplierData];
+        if (typeof value === 'string') {
+          return value.trim() !== '';
+        } else if (typeof value === 'boolean') {
+          return value;
+        } else if (Array.isArray(value)) {
+          return value.length > 0;
+        } else if (typeof value === 'number') {
+          return value > 0;
+        }
+        return false;
+      }).length;
+      return (filledCount / fields.length) * 100;
+    };
+
+    // Calculate progress for each section
+    const basicProgress = getSectionProgress(basicFields);
+    const landProgress = getSectionProgress(landFields);
+    const eudrProgress = getSectionProgress(eudrFields);
+    const isccProgress = getSectionProgress(isccFields);
+    const plantationProgress = getSectionProgress(plantationFields);
+    const reviewProgress = getSectionProgress(reviewFields);
+
+    // Calculate overall progress
+    const sections = [basicProgress, landProgress, eudrProgress, isccProgress, plantationProgress, reviewProgress];
+    const overallProgress = sections.reduce((sum, progress) => sum + progress, 0) / sections.length;
+
+    // Get current section progress for detailed view
+    const getCurrentSectionProgress = () => {
+      switch (currentTab) {
+        case 'basic': return basicProgress;
+        case 'land': return landProgress;
+        case 'eudr': return eudrProgress;
+        case 'iscc': return isccProgress;
+        case 'plantation': return plantationProgress;
+        case 'review': return reviewProgress;
+        default: return 0;
+      }
+    };
+
+    return {
+      overall: Math.round(overallProgress),
+      current: Math.round(getCurrentSectionProgress()),
+      sections: {
+        basic: Math.round(basicProgress),
+        land: Math.round(landProgress),
+        eudr: Math.round(eudrProgress),
+        iscc: Math.round(isccProgress),
+        plantation: Math.round(plantationProgress),
+        review: Math.round(reviewProgress)
+      }
+    };
   };
 
   const handleSubmit = () => {
-    console.log('Form submitted:', formData);
-    console.log('Uploaded files:', uploadedFiles);
-    alert('Supplier survey form submitted successfully!');
+    try {
+      // Validate required fields
+      if (!formData.supplierName?.trim()) {
+        alert('Supplier name is required');
+        setCurrentTab('basic');
+        return;
+      }
+
+      if (!formData.email?.trim()) {
+        alert('Email is required');
+        setCurrentTab('basic');
+        return;
+      }
+
+      if (!formData.phoneNumber?.trim()) {
+        alert('Phone number is required');
+        setCurrentTab('basic');
+        return;
+      }
+
+      if (!formData.declaration) {
+        alert('Please accept the declaration to submit the form');
+        setCurrentTab('review');
+        return;
+      }
+
+      // Prepare supplier data
+      const supplierData: Omit<SupplierData, 'id' | 'createdAt' | 'updatedAt'> = {
+        ...formData as SupplierData,
+        status: formData.status || 'pending',
+        type: formData.type || 'supplier',
+        // Generate new unique IDs only for new suppliers, not when editing
+        ...(supplierId ? {} : {
+          formId: generateFormId(),
+          uniqueSupplierId: generateSupplierId()
+        })
+      };
+
+      let savedSupplier: SupplierData;
+
+      if (supplierId) {
+        // Update existing supplier
+        savedSupplier = supplierDb.updateSupplier(supplierId, supplierData)!;
+        alert('Supplier updated successfully!');
+      } else {
+        // Create new supplier
+        savedSupplier = supplierDb.createSupplier(supplierData);
+        alert('Supplier created successfully!');
+      }
+
+      console.log('Form submitted:', savedSupplier);
+      console.log('Uploaded files:', uploadedFiles);
+
+      // Call onSave callback if provided
+      if (onSave) {
+        onSave(savedSupplier);
+      }
+
+      // Reset form if creating new supplier
+      if (!supplierId) {
+        resetForm();
+      }
+
+    } catch (error) {
+      console.error('Error saving supplier:', error);
+      alert('Error saving supplier. Please try again.');
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      formId: generateFormId(),
+      uniqueSupplierId: generateSupplierId(),
+      surveyDate: format(new Date(), 'yyyy-MM-dd'),
+      dateVerified: format(new Date(), 'yyyy-MM-dd'),
+      plots: [{ id: '1', identifier: 'Plot 1', size: 0, gpsCoordinates: '' }],
+      observedRedFlags: [],
+      fertilizerMonths: [],
+      proofOfOwnership: [],
+      previousLandUse: [],
+      environmentalPractices: [],
+      healthSafetyChecklist: [],
+      workerRights: [],
+      recordKeeping: [],
+      laborType: []
+    });
+    setCurrentTab('basic');
+    setUploadedFiles({});
   };
 
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="w-5 h-5" />
-            Supplier & Plantation Survey Form
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FileText className="w-5 h-5" />
+              Supplier & Plantation Survey Form
+            </div>
+            {supplierId && (
+              <div className="flex items-center gap-2 text-sm">
+                {autoSaveStatus === 'saving' && (
+                  <div className="flex items-center gap-1 text-blue-600">
+                    <RotateCcw className="w-4 h-4 animate-spin" />
+                    <span>Saving...</span>
+                  </div>
+                )}
+                {autoSaveStatus === 'saved' && (
+                  <div className="flex items-center gap-1 text-green-600">
+                    <CheckCircle className="w-4 h-4" />
+                    <span>Saved {lastSaved}</span>
+                  </div>
+                )}
+                {autoSaveStatus === 'error' && (
+                  <div className="flex items-center gap-1 text-red-600">
+                    <AlertTriangle className="w-4 h-4" />
+                    <span>Save failed</span>
+                  </div>
+                )}
+              </div>
+            )}
           </CardTitle>
           <CardDescription>
             Comprehensive supplier evaluation and compliance assessment
           </CardDescription>
           <div className="mt-4">
             <div className="flex justify-between text-sm mb-2">
-              <span>Form Progress</span>
-              <span>{Math.round(getProgress())}%</span>
+              <span>Overall Form Progress</span>
+              <span>{getProgress().overall}%</span>
             </div>
-            <Progress value={getProgress()} className="w-full" />
+            <Progress value={getProgress().overall} className="w-full mb-4" />
+
+            {/* Section Progress Details */}
+            <div className="grid grid-cols-6 gap-2 text-xs">
+              <div className="text-center">
+                <div className="font-medium mb-1">Basic Info</div>
+                <Progress value={getProgress().sections.basic} className="h-2" />
+                <div className="mt-1 text-muted-foreground">{getProgress().sections.basic}%</div>
+              </div>
+              <div className="text-center">
+                <div className="font-medium mb-1">Land Status</div>
+                <Progress value={getProgress().sections.land} className="h-2" />
+                <div className="mt-1 text-muted-foreground">{getProgress().sections.land}%</div>
+              </div>
+              <div className="text-center">
+                <div className="font-medium mb-1">EUDR</div>
+                <Progress value={getProgress().sections.eudr} className="h-2" />
+                <div className="mt-1 text-muted-foreground">{getProgress().sections.eudr}%</div>
+              </div>
+              <div className="text-center">
+                <div className="font-medium mb-1">ISCC</div>
+                <Progress value={getProgress().sections.iscc} className="h-2" />
+                <div className="mt-1 text-muted-foreground">{getProgress().sections.iscc}%</div>
+              </div>
+              <div className="text-center">
+                <div className="font-medium mb-1">Plantation</div>
+                <Progress value={getProgress().sections.plantation} className="h-2" />
+                <div className="mt-1 text-muted-foreground">{getProgress().sections.plantation}%</div>
+              </div>
+              <div className="text-center">
+                <div className="font-medium mb-1">Review</div>
+                <Progress value={getProgress().sections.review} className="h-2" />
+                <div className="mt-1 text-muted-foreground">{getProgress().sections.review}%</div>
+              </div>
+            </div>
           </div>
         </CardHeader>
       </Card>
@@ -273,7 +497,7 @@ const SupplierSurveyForm: React.FC = () => {
           <Card>
             <CardHeader>
               <CardTitle>Basic Information</CardTitle>
-              <CardDescription>General supplier and contact information</CardDescription>
+              <CardDescription>General supplier and contact information (* Required fields)</CardDescription>
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-6">
               <div className="space-y-2">
@@ -294,41 +518,45 @@ const SupplierSurveyForm: React.FC = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="supplierName">Supplier Name</Label>
+                <Label htmlFor="supplierName">Supplier Name *</Label>
                 <Input
                   id="supplierName"
-                  placeholder="Enter supplier name"
+                  placeholder={t('supplierForm.enterSupplierName')}
                   value={formData.supplierName || ''}
                   onChange={(e) => updateFormData('supplierName', e.target.value)}
+                  className={getFieldBorderClass('supplierName')}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="contactPerson">Contact Person</Label>
+                <Label htmlFor="contactPerson">Contact Person *</Label>
                 <Input
                   id="contactPerson"
-                  placeholder="Enter contact person name"
+                  placeholder={t('supplierForm.enterContactPerson')}
                   value={formData.contactPerson || ''}
                   onChange={(e) => updateFormData('contactPerson', e.target.value)}
+                  className={getFieldBorderClass('contactPerson')}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="phoneNumber">Phone Number</Label>
+                <Label htmlFor="phoneNumber">Phone Number *</Label>
                 <Input
                   id="phoneNumber"
                   type="tel"
-                  placeholder="Enter phone number"
+                  placeholder={t('supplierForm.enterPhoneNumber')}
                   value={formData.phoneNumber || ''}
                   onChange={(e) => updateFormData('phoneNumber', e.target.value)}
+                  className={getFieldBorderClass('phoneNumber')}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">Email *</Label>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="Enter email address"
+                  placeholder={t('supplierForm.enterEmailAddress')}
                   value={formData.email || ''}
                   onChange={(e) => updateFormData('email', e.target.value)}
+                  className={getFieldBorderClass('email')}
                 />
               </div>
               <div className="space-y-2">
@@ -341,13 +569,14 @@ const SupplierSurveyForm: React.FC = () => {
                 />
               </div>
               <div className="col-span-2 space-y-2">
-                <Label htmlFor="plantationAddress">Plantation Address</Label>
+                <Label htmlFor="plantationAddress">Plantation Address *</Label>
                 <Textarea
                   id="plantationAddress"
                   placeholder="Enter complete plantation address"
                   rows={3}
                   value={formData.plantationAddress || ''}
                   onChange={(e) => updateFormData('plantationAddress', e.target.value)}
+                  className={getFieldBorderClass('plantationAddress')}
                 />
               </div>
               <div className="col-span-2">
@@ -893,20 +1122,21 @@ const SupplierSurveyForm: React.FC = () => {
                     <Label htmlFor="totalLandSize">Total Land Size (Ha)</Label>
                     <Input
                       id="totalLandSize"
-                      type="number"
+                      type="text"
                       placeholder="e.g., 50"
-                      value={formData.totalLandSize || ''}
-                      onChange={(e) => updateFormData('totalLandSize', parseFloat(e.target.value) || 0)}
+                      value={formData.totalLandSize ? formatNumber(formData.totalLandSize) : ''}
+                      onChange={(e) => updateFormData('totalLandSize', parseFormattedNumber(e.target.value))}
+                      className={getFieldBorderClass('totalLandSize')}
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="estimatedYield">Estimated Yield (kg/Ha)</Label>
                     <Input
                       id="estimatedYield"
-                      type="number"
-                      placeholder="e.g., 20000"
-                      value={formData.estimatedYield || ''}
-                      onChange={(e) => updateFormData('estimatedYield', parseFloat(e.target.value) || 0)}
+                      type="text"
+                      placeholder="e.g., 20,000"
+                      value={formData.estimatedYield ? formatNumber(formData.estimatedYield) : ''}
+                      onChange={(e) => updateFormData('estimatedYield', parseFormattedNumber(e.target.value))}
                     />
                   </div>
                   <div className="space-y-2">
@@ -1133,30 +1363,30 @@ const SupplierSurveyForm: React.FC = () => {
                     <Label htmlFor="costFertilizer">Cost: Fertilizer (IDR/year)</Label>
                     <Input
                       id="costFertilizer"
-                      type="number"
-                      placeholder="e.g., 5000000"
-                      value={formData.costFertilizer || ''}
-                      onChange={(e) => updateFormData('costFertilizer', parseFloat(e.target.value) || 0)}
+                      type="text"
+                      placeholder="e.g., 5,000,000"
+                      value={formData.costFertilizer ? formatNumber(formData.costFertilizer) : ''}
+                      onChange={(e) => updateFormData('costFertilizer', parseFormattedNumber(e.target.value))}
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="costLabor">Cost: Labor (IDR/year)</Label>
                     <Input
                       id="costLabor"
-                      type="number"
-                      placeholder="e.g., 120000000"
-                      value={formData.costLabor || ''}
-                      onChange={(e) => updateFormData('costLabor', parseFloat(e.target.value) || 0)}
+                      type="text"
+                      placeholder="e.g., 120,000,000"
+                      value={formData.costLabor ? formatNumber(formData.costLabor) : ''}
+                      onChange={(e) => updateFormData('costLabor', parseFormattedNumber(e.target.value))}
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="costTransport">Cost: Transport (IDR/shipment)</Label>
                     <Input
                       id="costTransport"
-                      type="number"
-                      placeholder="e.g., 1500000"
-                      value={formData.costTransport || ''}
-                      onChange={(e) => updateFormData('costTransport', parseFloat(e.target.value) || 0)}
+                      type="text"
+                      placeholder="e.g., 1,500,000"
+                      value={formData.costTransport ? formatNumber(formData.costTransport) : ''}
+                      onChange={(e) => updateFormData('costTransport', parseFormattedNumber(e.target.value))}
                     />
                   </div>
                 </div>
@@ -1390,7 +1620,7 @@ const SupplierSurveyForm: React.FC = () => {
                     <Label htmlFor="supplierSignature">Supplier Signature and Name</Label>
                     <Input
                       id="supplierSignature"
-                      placeholder="Enter supplier name"
+                      placeholder={t('supplierForm.enterSupplierName')}
                       value={formData.supplierSignature || ''}
                       onChange={(e) => updateFormData('supplierSignature', e.target.value)}
                     />
@@ -1430,19 +1660,26 @@ const SupplierSurveyForm: React.FC = () => {
       </Tabs>
 
       <div className="flex justify-between pt-6">
-        <Button
-          variant="outline"
-          onClick={() => {
-            const tabs = ['basic', 'land', 'eudr', 'iscc', 'plantation', 'review'];
-            const currentIndex = tabs.indexOf(currentTab);
-            if (currentIndex > 0) {
-              setCurrentTab(tabs[currentIndex - 1]);
-            }
-          }}
-          disabled={currentTab === 'basic'}
-        >
-          Previous
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => {
+              const tabs = ['basic', 'land', 'eudr', 'iscc', 'plantation', 'review'];
+              const currentIndex = tabs.indexOf(currentTab);
+              if (currentIndex > 0) {
+                setCurrentTab(tabs[currentIndex - 1]);
+              }
+            }}
+            disabled={currentTab === 'basic'}
+          >
+            Previous
+          </Button>
+          {onCancel && (
+            <Button variant="outline" onClick={onCancel}>
+              Cancel
+            </Button>
+          )}
+        </div>
         <Button
           onClick={() => {
             const tabs = ['basic', 'land', 'eudr', 'iscc', 'plantation', 'review'];

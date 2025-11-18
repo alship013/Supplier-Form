@@ -13,6 +13,7 @@ import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { FileText, Calculator, Plus, Trash2, AlertCircle } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { ContractType, ContractStatus } from '@/types/contract';
 import type { ContractCreationData } from '@/types/contract';
 import { mockContractTemplates } from '@/data/mockContracts';
@@ -30,8 +31,9 @@ const ContractCreationForm: React.FC<ContractCreationFormProps> = ({
   onContractCreated,
   onCancel
 }) => {
+  const { t } = useLanguage();
   const [currentTab, setCurrentTab] = useState('basic');
-  const [selectedTemplate, setSelectedTemplate] = useState<string>('');
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('custom');
   const [formData, setFormData] = useState<Partial<ContractCreationData>>({
     supplierId,
     type: ContractType.PURCHASE_AGREEMENT,
@@ -189,7 +191,7 @@ const ContractCreationForm: React.FC<ContractCreationFormProps> = ({
                     <SelectValue placeholder="Choose a template to pre-fill contract" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Custom Contract</SelectItem>
+                    <SelectItem value="custom">Custom Contract</SelectItem>
                     {mockContractTemplates.map((template) => (
                       <SelectItem key={template.id} value={template.id}>
                         <div className="flex flex-col">
@@ -204,10 +206,10 @@ const ContractCreationForm: React.FC<ContractCreationFormProps> = ({
 
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label htmlFor="contractType">Contract Type</Label>
+                  <Label htmlFor="contractType">{t('contractForm.contractType')}</Label>
                   <Select value={formData.type || ''} onValueChange={(value) => updateFormData('type', value)}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select contract type" />
+                      <SelectValue placeholder={t('contractForm.selectContractType')} />
                     </SelectTrigger>
                     <SelectContent>
                       {contractTypeOptions.map((option) => (
@@ -219,10 +221,10 @@ const ContractCreationForm: React.FC<ContractCreationFormProps> = ({
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="title">Contract Title</Label>
+                  <Label htmlFor="title">{t('contractForm.contractTitle')}</Label>
                   <Input
                     id="title"
-                    placeholder="Enter contract title"
+                    placeholder={t('contractForm.enterContractTitle')}
                     value={formData.title || ''}
                     onChange={(e) => updateFormData('title', e.target.value)}
                   />
@@ -230,10 +232,10 @@ const ContractCreationForm: React.FC<ContractCreationFormProps> = ({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
+                <Label htmlFor="description">{t('contractForm.contractDescription')}</Label>
                 <Textarea
                   id="description"
-                  placeholder="Enter contract description and purpose"
+                  placeholder={t('contractForm.enterContractDescription')}
                   rows={4}
                   value={formData.description || ''}
                   onChange={(e) => updateFormData('description', e.target.value)}
@@ -287,12 +289,12 @@ const ContractCreationForm: React.FC<ContractCreationFormProps> = ({
                   <Label htmlFor="volumeUnit">Volume Unit</Label>
                   <Select value={formData.volumeUnit || ''} onValueChange={(value) => updateFormData('volumeUnit', value)}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select unit" />
+                      <SelectValue placeholder={t('contractForm.selectUnit')} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="MT">Metric Tons (MT)</SelectItem>
-                      <SelectItem value="KG">Kilograms (KG)</SelectItem>
-                      <SelectItem value="TON">Tons</SelectItem>
+                      <SelectItem value="MT">{t('contractForm.metricTons')}</SelectItem>
+                      <SelectItem value="KG">{t('contractForm.kilograms')}</SelectItem>
+                      <SelectItem value="TON">{t('contractForm.tons')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -300,7 +302,7 @@ const ContractCreationForm: React.FC<ContractCreationFormProps> = ({
                   <Label htmlFor="deliveryFrequency">Delivery Frequency</Label>
                   <Select defaultValue="weekly">
                     <SelectTrigger>
-                      <SelectValue placeholder="Select frequency" />
+                      <SelectValue placeholder={t('contractForm.selectFrequency')} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="weekly">Weekly</SelectItem>
@@ -329,13 +331,13 @@ const ContractCreationForm: React.FC<ContractCreationFormProps> = ({
                     <Label>Incoterms</Label>
                     <Select defaultValue="FCA">
                       <SelectTrigger>
-                        <SelectValue placeholder="Select incoterms" />
+                        <SelectValue placeholder={t('contractForm.selectIncoterms')} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="EXW">EXW (Ex Works)</SelectItem>
-                        <SelectItem value="FCA">FCA (Free Carrier)</SelectItem>
-                        <SelectItem value="FOB">FOB (Free On Board)</SelectItem>
-                        <SelectItem value="CIF">CIF (Cost, Insurance & Freight)</SelectItem>
+                        <SelectItem value="EXW">{t('contractForm.exWorks')}</SelectItem>
+                        <SelectItem value="FCA">{t('contractForm.freeCarrier')}</SelectItem>
+                        <SelectItem value="FOB">{t('contractForm.freeOnBoard')}</SelectItem>
+                        <SelectItem value="CIF">{t('contractForm.costInsuranceFreight')}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -351,7 +353,7 @@ const ContractCreationForm: React.FC<ContractCreationFormProps> = ({
                     <Label>Payment Method</Label>
                     <Select defaultValue="bank_transfer">
                       <SelectTrigger>
-                        <SelectValue placeholder="Select method" />
+                        <SelectValue placeholder={t('contractForm.selectMethod')} />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
@@ -524,7 +526,7 @@ const ContractCreationForm: React.FC<ContractCreationFormProps> = ({
                   <Label htmlFor="priceUnit">Price Unit</Label>
                   <Select value={formData.priceUnit || ''} onValueChange={(value) => updateFormData('priceUnit', value)}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select unit" />
+                      <SelectValue placeholder={t('contractForm.selectUnit')} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="IDR/kg">IDR/kg</SelectItem>
