@@ -396,7 +396,7 @@ const DashboardPage = () => {
 
 function App() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(false);
+  const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(false); // Always expanded on desktop
   const [isMobile, setIsMobile] = useState(false);
 
   // Detect mobile screen size
@@ -421,9 +421,8 @@ function App() {
   const handleSidebarToggle = () => {
     if (isMobile) {
       setIsMobileMenuOpen(!isMobileMenuOpen);
-    } else {
-      setIsDesktopCollapsed(!isDesktopCollapsed);
     }
+    // Desktop sidebar is not retractable anymore
   };
 
   const closeMobileMenu = () => {
@@ -438,7 +437,7 @@ function App() {
         <div className="flex h-screen bg-gray-50 relative">
           {/* Sidebar */}
           <Sidebar
-            isCollapsed={isMobile ? false : isDesktopCollapsed}
+            isCollapsed={false} // Always expanded on desktop
             onToggle={handleSidebarToggle}
             isMobile={isMobile}
             isMobileMenuOpen={isMobileMenuOpen}
@@ -454,9 +453,7 @@ function App() {
           )}
 
           {/* Main content area */}
-          <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${
-            isMobile ? 'ml-0' : (isDesktopCollapsed ? 'ml-16' : 'ml-64')
-          }`}>
+          <div className="flex-1 flex flex-col overflow-hidden">
             <Header
               onMobileMenuToggle={handleMobileMenuToggle}
               isMobileMenuOpen={isMobileMenuOpen}

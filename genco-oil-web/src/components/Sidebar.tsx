@@ -122,7 +122,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         "relative"
       ),
       // Width classes
-      isCollapsed && !isMobile ? "w-16" : isMobile ? "w-64" : "w-64",
+      isMobile ? "w-64" : "w-64", // Always expanded on desktop
       // Mobile show/hide
       isMobile && (
         isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
@@ -132,23 +132,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="p-4 border-b border-primary-600">
         <div className={cn(
           "flex items-center justify-between",
-          isCollapsed && "justify-center"
+          !isMobile && "justify-center"
         )}>
-          <div className={cn(
-            "flex items-center gap-3",
-            isCollapsed && "justify-center"
-          )}>
+          <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-primary-600 rounded-lg flex items-center justify-center">
               <Package className="w-5 h-5 text-white" />
             </div>
-            {!isCollapsed && (
+            {!isMobile && (
               <div>
                 <h1 className="text-lg font-bold">Genco Oil</h1>
                 <p className="text-primary-200 text-xs">{t('sidebar.platform')}</p>
               </div>
             )}
           </div>
-          {isMobile ? (
+          {isMobile && (
             <Button
               variant="ghost"
               size="icon"
@@ -156,15 +153,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className="text-primary-200 hover:text-white hover:bg-primary-600"
             >
               <X className="w-4 h-4" />
-            </Button>
-          ) : (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onToggle}
-              className="text-primary-200 hover:text-white hover:bg-primary-600"
-            >
-              {isCollapsed ? <Menu className="w-4 h-4" /> : <X className="w-4 h-4" />}
             </Button>
           )}
         </div>
@@ -182,12 +170,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     "w-full justify-start gap-3",
                     currentPath === item.href
                       ? "bg-primary-600 text-white hover:bg-primary-500"
-                      : "text-primary-100 hover:bg-primary-600 hover:text-white",
-                    (isCollapsed && !isMobile) && "justify-center"
+                      : "text-primary-100 hover:bg-primary-600 hover:text-white"
                   )}
                 >
                   {item.icon}
-                  {(!isCollapsed || isMobile) && (
+                  {true && ( // Always show labels on desktop
                     <>
                       <span className="font-medium">{item.label}</span>
                       {item.badge && (
@@ -206,14 +193,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Footer */}
       <div className="p-4 border-t border-primary-600">
-        {/* Version and Copyright */}
-        {!isCollapsed && (
+        {/* Version and Copyright - always show on desktop */}
+        {!isMobile && (
           <div className="text-primary-200 text-xs space-y-1">
             <p>Version 1.0.0</p>
             <p>© 2024 Genco Oil</p>
           </div>
         )}
-        {isCollapsed && (
+        {isMobile && (
           <div className="w-10 h-10 bg-primary-600 rounded-full flex items-center justify-center mx-auto">
             <Users className="w-5 h-5" />
           </div>
