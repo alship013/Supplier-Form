@@ -23,9 +23,9 @@ export const LanguageSwitcher: React.FC = () => {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
-          variant="ghost"
+          variant="outline"
           size="sm"
-          className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors px-3"
+          className="flex items-center gap-2 text-gray-700 bg-white hover:bg-gray-50 hover:text-gray-900 border-gray-300 transition-colors px-3 shadow-sm"
         >
           <Globe className="w-4 h-4" />
           <span className="text-sm font-medium">
@@ -34,13 +34,13 @@ export const LanguageSwitcher: React.FC = () => {
           <ChevronDown className="w-3 h-3" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48">
+      <DropdownMenuContent align="end" className="w-48 bg-white border-gray-200 shadow-lg">
         {languages.map((lang) => (
           <DropdownMenuItem
             key={lang.code}
             onClick={() => setLanguage(lang.code as 'en' | 'id')}
-            className={`flex items-center gap-3 cursor-pointer ${
-              language === lang.code ? 'bg-accent' : ''
+            className={`flex items-center gap-3 cursor-pointer hover:bg-gray-50 ${
+              language === lang.code ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
             }`}
           >
             <span className="text-lg">{lang.flag}</span>

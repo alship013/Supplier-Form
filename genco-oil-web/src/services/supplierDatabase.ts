@@ -9,6 +9,7 @@ export interface SupplierData {
   email: string;
   plantationAddress: string;
   gpsCoordinate: string;
+  product: string;
 
   // Land Status and Legality
   ownershipType: string;

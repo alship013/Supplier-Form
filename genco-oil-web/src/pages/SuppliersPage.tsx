@@ -39,6 +39,7 @@ const SuppliersPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'supplier' | 'farmer'>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive' | 'pending'>('all');
+  const [filterProduct, setFilterProduct] = useState<string>('all');
   const [isContractFormOpen, setIsContractFormOpen] = useState(false);
   const [selectedSupplierForContract, setSelectedSupplierForContract] = useState<SupplierData | null>(null);
   const [isUnifiedFormOpen, setIsUnifiedFormOpen] = useState(false);
@@ -59,6 +60,10 @@ const SuppliersPage: React.FC = () => {
     search: searchTerm,
     type: filterType,
     status: filterStatus
+  }).filter(supplier => {
+    // Apply product filter
+    if (filterProduct === 'all') return true;
+    return supplier.product === filterProduct;
   });
 
   const getStatusBadge = (status: string) => {
@@ -210,6 +215,19 @@ const SuppliersPage: React.FC = () => {
             <SelectItem value="pending">Pending</SelectItem>
           </SelectContent>
         </Select>
+        <Select value={filterProduct} onValueChange={(value: string) => setFilterProduct(value)}>
+          <SelectTrigger className="w-[150px]">
+            <SelectValue placeholder="Product" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Products</SelectItem>
+            <SelectItem value="Rubber Seed">Rubber Seed</SelectItem>
+            <SelectItem value="Copra">Copra</SelectItem>
+            <SelectItem value="Plastic">Plastic</SelectItem>
+            <SelectItem value="POME">POME</SelectItem>
+            <SelectItem value="Enzyme">Enzyme</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <Card>
@@ -225,6 +243,7 @@ const SuppliersPage: React.FC = () => {
               <TableRow>
                 <TableHead>Supplier Name</TableHead>
                 <TableHead>Type</TableHead>
+                <TableHead>Product</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Contact</TableHead>
                 <TableHead>Location</TableHead>
@@ -238,6 +257,15 @@ const SuppliersPage: React.FC = () => {
                 <TableRow key={supplier.id}>
                   <TableCell className="font-medium">{safeRender(supplier.supplierName, 'Invalid supplier name')}</TableCell>
                   <TableCell>{getTypeBadge(supplier.type)}</TableCell>
+                  <TableCell>
+                    {supplier.product ? (
+                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                        {safeRender(supplier.product, 'Not specified')}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground text-sm">Not specified</span>
+                    )}
+                  </TableCell>
                   <TableCell>{getStatusBadge(supplier.status)}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     <div>{safeRender(supplier.email, 'Invalid email')}</div>

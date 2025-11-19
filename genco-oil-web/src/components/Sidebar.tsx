@@ -16,7 +16,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { SidebarLanguageSwitcher } from '@/components/SidebarLanguageSwitcher';
 
 interface NavItem {
   id: string;
@@ -171,10 +170,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </nav>
 
       {/* Footer */}
-      <div className="p-4 border-t border-primary-600 space-y-3">
-        {/* Language Switcher */}
-        <SidebarLanguageSwitcher isCollapsed={isCollapsed} />
-
+      <div className="p-4 border-t border-primary-600">
         {/* Version and Copyright */}
         {!isCollapsed && (
           <div className="text-primary-200 text-xs space-y-1">

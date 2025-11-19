@@ -46,6 +46,8 @@ const SupplierSurveyForm: React.FC<SupplierSurveyFormProps> = ({ supplierId, onS
     uniqueSupplierId: generateSupplierId(),
     surveyDate: format(new Date(), 'yyyy-MM-dd'),
     dateVerified: format(new Date(), 'yyyy-MM-dd'),
+    type: 'supplier',
+    product: '',
     plots: [{ id: '1', identifier: 'Plot 1', size: 0, gpsCoordinates: '' }],
     observedRedFlags: [],
     fertilizerMonths: [],
@@ -72,6 +74,50 @@ const SupplierSurveyForm: React.FC<SupplierSurveyFormProps> = ({ supplierId, onS
   const parseFormattedNumber = (formatted: string): number => {
     const unformatted = formatted.replace(/,/g, '');
     return parseFloat(unformatted) || 0;
+  };
+
+  // GPS coordinate validation function
+  const validateGPSCoordinates = (coord: string) => {
+    if (!coord || coord.trim() === '') {
+      return { valid: false, reason: 'empty' };
+    }
+
+    const trimmed = coord.trim();
+
+    // Check for obvious non-numeric content
+    if (trimmed.toLowerCase().includes('not') ||
+        trimmed.toLowerCase().includes('n/a') ||
+        trimmed.toLowerCase().includes('none') ||
+        trimmed.toLowerCase().includes('unknown') ||
+        trimmed.toLowerCase().includes('pending')) {
+      return { valid: false, reason: 'not_provided' };
+    }
+
+    // Try to parse decimal degrees format: "latitude,longitude"
+    if (trimmed.includes(',')) {
+      try {
+        const [lat, lng] = trimmed.split(',').map(s => parseFloat(s.trim()));
+
+        if (isNaN(lat) || isNaN(lng)) {
+          return { valid: false, reason: 'invalid_format' };
+        }
+
+        // Validate coordinate ranges
+        if (lat < -90 || lat > 90) {
+          return { valid: false, reason: 'invalid_latitude' };
+        }
+
+        if (lng < -180 || lng > 180) {
+          return { valid: false, reason: 'invalid_longitude' };
+        }
+
+        return { valid: true, reason: 'success' };
+      } catch (error) {
+        return { valid: false, reason: 'parse_error' };
+      }
+    }
+
+    return { valid: false, reason: 'unrecognized_format' };
   };
 
   // Field validation helper
@@ -388,6 +434,8 @@ const SupplierSurveyForm: React.FC<SupplierSurveyFormProps> = ({ supplierId, onS
       uniqueSupplierId: generateSupplierId(),
       surveyDate: format(new Date(), 'yyyy-MM-dd'),
       dateVerified: format(new Date(), 'yyyy-MM-dd'),
+      type: 'supplier',
+      product: '',
       plots: [{ id: '1', identifier: 'Plot 1', size: 0, gpsCoordinates: '' }],
       observedRedFlags: [],
       fertilizerMonths: [],
@@ -560,13 +608,47 @@ const SupplierSurveyForm: React.FC<SupplierSurveyFormProps> = ({ supplierId, onS
                 />
               </div>
               <div className="space-y-2">
+                <Label htmlFor="type">Supplier Type *</Label>
+                <Select value={formData.type || ''} onValueChange={(value) => updateFormData('type', value as 'supplier' | 'farmer')}>
+                  <SelectTrigger className={getFieldBorderClass('type')}>
+                    <SelectValue placeholder="Select supplier type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="supplier">Supplier</SelectItem>
+                    <SelectItem value="farmer">Farmer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="product">Primary Product *</Label>
+                <Select value={formData.product || ''} onValueChange={(value) => updateFormData('product', value)}>
+                  <SelectTrigger className={getFieldBorderClass('product')}>
+                    <SelectValue placeholder="Select primary product" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Rubber Seed">Rubber Seed</SelectItem>
+                    <SelectItem value="Copra">Copra</SelectItem>
+                    <SelectItem value="Plastic">Plastic</SelectItem>
+                    <SelectItem value="POME">POME (Palm Oil Mill Effluent)</SelectItem>
+                    <SelectItem value="Enzyme">Enzyme</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-gray-500">Select the main product supplied by this entity</p>
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="gpsCoordinate">GPS Coordinates</Label>
                 <Input
                   id="gpsCoordinate"
-                  placeholder="Latitude, Longitude"
+                  placeholder="Example: -7.743331, 110.405178"
                   value={formData.gpsCoordinate || ''}
                   onChange={(e) => updateFormData('gpsCoordinate', e.target.value)}
+                  className={formData.gpsCoordinate && validateGPSCoordinates(formData.gpsCoordinate).valid ? 'border-green-300 focus:border-green-500' : ''}
                 />
+                <p className="text-xs text-gray-500">
+                  Format: latitude, longitude in decimal degrees
+                  <br />
+                  Examples: -7.743331, 110.405178 (Yogyakarta) • 1.3521, 103.8198 (Singapore)
+                </p>
               </div>
               <div className="col-span-2 space-y-2">
                 <Label htmlFor="plantationAddress">Plantation Address *</Label>
