@@ -29,12 +29,18 @@ interface SidebarProps {
   activeItem?: string;
   isCollapsed?: boolean;
   onToggle?: () => void;
+  isMobile?: boolean;
+  isMobileMenuOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   activeItem: _activeItem = 'dashboard',
   isCollapsed = false,
-  onToggle
+  onToggle,
+  isMobile = false,
+  isMobileMenuOpen = false,
+  onMobileClose
 }) => {
   const location = useLocation();
   const currentPath = location.pathname;
@@ -99,10 +105,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
       href: '/settings'
     }
   ];
+
+  const handleNavigation = () => {
+    if (isMobile && onMobileClose) {
+      onMobileClose();
+    }
+  };
+
   return (
     <div className={cn(
       "flex flex-col h-screen bg-primary-700 text-white transition-all duration-300",
-      isCollapsed ? "w-16" : "w-64"
+      // Mobile positioning
+      isMobile ? (
+        "fixed inset-y-0 left-0 z-30 transform lg:hidden"
+      ) : (
+        "relative"
+      ),
+      // Width classes
+      isCollapsed && !isMobile ? "w-16" : isMobile ? "w-64" : "w-64",
+      // Mobile show/hide
+      isMobile && (
+        isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+      )
     )}>
       {/* Header */}
       <div className="p-4 border-b border-primary-600">
@@ -124,14 +148,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
             )}
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onToggle}
-            className="text-primary-200 hover:text-white hover:bg-primary-600"
-          >
-            {isCollapsed ? <Menu className="w-4 h-4" /> : <X className="w-4 h-4" />}
-          </Button>
+          {isMobile ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onMobileClose}
+              className="text-primary-200 hover:text-white hover:bg-primary-600"
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          ) : (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onToggle}
+              className="text-primary-200 hover:text-white hover:bg-primary-600"
+            >
+              {isCollapsed ? <Menu className="w-4 h-4" /> : <X className="w-4 h-4" />}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -140,7 +175,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <ul className="space-y-2">
           {navItems.map((item) => (
             <li key={item.id}>
-              <Link to={item.href}>
+              <Link to={item.href} onClick={handleNavigation}>
                 <Button
                   variant={currentPath === item.href ? "secondary" : "ghost"}
                   className={cn(
@@ -148,11 +183,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     currentPath === item.href
                       ? "bg-primary-600 text-white hover:bg-primary-500"
                       : "text-primary-100 hover:bg-primary-600 hover:text-white",
-                    isCollapsed && "justify-center"
+                    (isCollapsed && !isMobile) && "justify-center"
                   )}
                 >
                   {item.icon}
-                  {!isCollapsed && (
+                  {(!isCollapsed || isMobile) && (
                     <>
                       <span className="font-medium">{item.label}</span>
                       {item.badge && (

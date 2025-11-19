@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Users,
   Package,
@@ -10,7 +10,9 @@ import {
   Truck,
   Search,
   Bell,
-  Moon
+  Moon,
+  Menu,
+  X
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -74,22 +76,22 @@ const StatCard = ({ title, value, change, changeType, icon, color, t }: {
   color: string;
   t: (key: string) => string;
 }) => (
-  <Card className="hover:shadow-lg transition-all duration-200 hover:scale-105">
-    <CardContent className="p-6">
-      <div className="flex items-center justify-between">
-        <div className="flex-1">
-          <p className="text-sm font-medium text-muted-foreground mb-2">{title}</p>
-          <p className="text-2xl font-bold mb-2">{value}</p>
+  <Card className="hover:shadow-lg transition-all duration-200 hover:scale-[1.02] sm:hover:scale-105">
+    <CardContent className="p-4 sm:p-6">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <p className="text-xs sm:text-sm font-medium text-muted-foreground mb-1 sm:mb-2 truncate">{title}</p>
+          <p className="text-xl sm:text-2xl font-bold mb-1 sm:mb-2">{value}</p>
           <div className="flex items-center gap-2">
-            <span className={`text-sm font-medium ${
+            <span className={`text-xs sm:text-sm font-medium ${
               changeType === 'increase' ? 'text-green-600' : 'text-red-600'
             }`}>
               {change}
             </span>
-            <span className="text-sm text-muted-foreground">{t('dashboard.vsLastMonth')}</span>
+            <span className="text-xs sm:text-sm text-muted-foreground hidden sm:inline">{t('dashboard.vsLastMonth')}</span>
           </div>
         </div>
-        <div className={`p-3 rounded-lg ${color}`}>
+        <div className={`p-2 sm:p-3 rounded-lg ${color} flex-shrink-0`}>
           {icon}
         </div>
       </div>
@@ -97,32 +99,47 @@ const StatCard = ({ title, value, change, changeType, icon, color, t }: {
   </Card>
 );
 
-const Header = () => {
+const Header = ({ onMobileMenuToggle, isMobileMenuOpen }: {
+  onMobileMenuToggle: () => void;
+  isMobileMenuOpen: boolean;
+}) => {
   const { t } = useLanguage();
 
   return (
-    <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-      <div className="flex items-center gap-4 flex-1">
-        <div className="relative max-w-md flex-1">
+    <header className="bg-white border-b border-gray-200 px-4 sm:px-6 py-4 flex items-center justify-between sticky top-0 z-30">
+      <div className="flex items-center gap-3 sm:gap-4 flex-1">
+        {/* Mobile menu button */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onMobileMenuToggle}
+          className="lg:hidden"
+        >
+          {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+        </Button>
+
+        <div className="relative w-full max-w-xs sm:max-w-md flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
           <Input
             type="text"
             placeholder={t('common.searchPlaceholder')}
-            className="pl-10"
+            className="pl-10 pr-4"
           />
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 sm:gap-4">
         <LanguageSwitcher />
-        <Button variant="ghost" size="icon">
+        <Button variant="ghost" size="icon" className="hidden sm:flex">
           <Moon className="w-5 h-5" />
         </Button>
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="w-5 h-5" />
           <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
         </Button>
-        <div className="flex items-center gap-3">
+
+        {/* User profile - simplified on mobile */}
+        <div className="hidden sm:flex items-center gap-3">
           <div className="text-right">
             <div className="text-sm font-medium text-gray-900">Admin User</div>
             <div className="text-xs text-gray-500">{t('common.systemAdministrator')}</div>
@@ -130,6 +147,11 @@ const Header = () => {
           <div className="w-10 h-10 bg-primary-600 rounded-full flex items-center justify-center text-white font-medium">
             A
           </div>
+        </div>
+
+        {/* Mobile only user avatar */}
+        <div className="w-8 h-8 sm:hidden bg-primary-600 rounded-full flex items-center justify-center text-white font-medium text-sm">
+          A
         </div>
       </div>
     </header>
@@ -192,19 +214,19 @@ const DashboardPage = () => {
 
   return (
     <>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">{t('dashboard.title')}</h1>
-        <p className="text-gray-600">{t('dashboard.subtitle')}</p>
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">{t('dashboard.title')}</h1>
+        <p className="text-sm sm:text-base text-gray-600">{t('dashboard.subtitle')}</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
         {statCards.map((stat, index) => (
           <StatCard key={index} {...stat} t={t} />
         ))}
       </div>
 
       {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
         {/* Supply Chain Volume Chart */}
         <Card>
           <CardHeader>
@@ -305,16 +327,16 @@ const DashboardPage = () => {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6">
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
               <Activity className="w-5 h-5 text-primary-600" />
               {t('dashboard.quickActions')}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <Button variant="outline" className="h-auto p-4 justify-start text-left">
                 <div className="flex flex-col items-start">
                   <Plus className="w-6 h-6 text-primary-600 mb-2" />
@@ -373,14 +395,73 @@ const DashboardPage = () => {
 };
 
 function App() {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Detect mobile screen size
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 1024; // lg breakpoint
+      setIsMobile(mobile);
+      if (mobile) {
+        setIsMobileMenuOpen(false); // Auto-close mobile menu when switching to mobile
+      }
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  const handleMobileMenuToggle = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
+
+  const handleSidebarToggle = () => {
+    if (isMobile) {
+      setIsMobileMenuOpen(!isMobileMenuOpen);
+    } else {
+      setIsDesktopCollapsed(!isDesktopCollapsed);
+    }
+  };
+
+  const closeMobileMenu = () => {
+    if (isMobile) {
+      setIsMobileMenuOpen(false);
+    }
+  };
+
   return (
     <LanguageProvider>
       <Router>
-        <div className="flex h-screen bg-gray-50">
-          <Sidebar />
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <Header />
-            <main className="flex-1 overflow-auto p-6">
+        <div className="flex h-screen bg-gray-50 relative">
+          {/* Sidebar */}
+          <Sidebar
+            isCollapsed={isMobile ? false : isDesktopCollapsed}
+            onToggle={handleSidebarToggle}
+            isMobile={isMobile}
+            isMobileMenuOpen={isMobileMenuOpen}
+            onMobileClose={closeMobileMenu}
+          />
+
+          {/* Mobile backdrop */}
+          {isMobile && isMobileMenuOpen && (
+            <div
+              className="fixed inset-0 bg-black bg-opacity-50 z-20 lg:hidden"
+              onClick={closeMobileMenu}
+            />
+          )}
+
+          {/* Main content area */}
+          <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${
+            isMobile ? 'ml-0' : (isDesktopCollapsed ? 'ml-16' : 'ml-64')
+          }`}>
+            <Header
+              onMobileMenuToggle={handleMobileMenuToggle}
+              isMobileMenuOpen={isMobileMenuOpen}
+            />
+            <main className="flex-1 overflow-auto p-4 sm:p-6">
               <Routes>
                 <Route path="/" element={<DashboardPage />} />
                 <Route path="/suppliers" element={<SuppliersPage />} />
