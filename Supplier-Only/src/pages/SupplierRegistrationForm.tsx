@@ -24,6 +24,7 @@ interface SupplierFormData {
   email: string;
   plantationAddress: string;
   gpsCoordinate: string;
+  primaryProduct: string;
   type: 'supplier' | 'farmer';
 
   // Land Status and Legality
@@ -154,6 +155,7 @@ const SupplierRegistrationForm: React.FC = () => {
     email: '',
     plantationAddress: '',
     gpsCoordinate: '',
+    primaryProduct: '',
     type: 'supplier',
 
     // Land Status and Legality
@@ -563,6 +565,23 @@ const SupplierRegistrationForm: React.FC = () => {
                     onChange={(e) => updateFormData('surveyDate', e.target.value)}
                   />
                 </div>
+              </div>
+
+              <div>
+                <Label htmlFor="primaryProduct">Primary Product</Label>
+                <Select value={formData.primaryProduct} onValueChange={(value) => updateFormData('primaryProduct', value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select primary product" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Rubber Seed">Rubber Seed</SelectItem>
+                    <SelectItem value="Copra">Copra</SelectItem>
+                    <SelectItem value="Plastic">Plastic</SelectItem>
+                    <SelectItem value="POME">POME (Palm Oil Mill Effluent)</SelectItem>
+                    <SelectItem value="Enzyme">Enzyme</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-gray-500 mt-1">Select the main product you supply or produce</p>
               </div>
 
               <div>
