@@ -10,7 +10,71 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { ArrowLeft, Upload, MapPin, Users, TreePine, Shield, FileText, Camera, Calendar, AlertTriangle, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Upload, MapPin, Users, TreePine, Shield, FileText, Camera, Calendar, AlertTriangle, CheckCircle, X } from 'lucide-react';
+
+// File upload interfaces
+interface UploadedFile {
+  file: File;
+  preview: string;
+  compressedFile?: File;
+}
+
+// High-quality image processing function
+const processImage = (file: File): Promise<File> => {
+  return new Promise((resolve) => {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+
+    img.onload = () => {
+      let { width, height } = img;
+
+      // Only process if image is extremely large (>4000px) to maintain quality
+      const maxDimension = 4000;
+
+      if (width <= maxDimension && height <= maxDimension && file.size <= 8 * 1024 * 1024) {
+        // Return original if it's already good quality
+        resolve(file);
+        return;
+      }
+
+      // Smart resizing only for very large images
+      if (width > maxDimension || height > maxDimension) {
+        const ratio = Math.min(maxDimension / width, maxDimension / height);
+        width *= ratio;
+        height *= ratio;
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+
+      // High-quality rendering
+      if (ctx) {
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, width, height);
+      }
+
+      canvas.toBlob(
+        (blob) => {
+          if (blob && blob.size < file.size) {
+            resolve(new File([blob], file.name, {
+              type: file.type,
+              lastModified: Date.now(),
+            }));
+          } else {
+            // Return original if processing doesn't improve quality or size
+            resolve(file);
+          }
+        },
+        file.type,
+        0.95 // Very high quality (95%)
+      );
+    };
+
+    img.src = URL.createObjectURL(file);
+  });
+};
 
 // Comprehensive form data interface based on requirements
 interface SupplierFormData {
@@ -105,11 +169,11 @@ interface SupplierFormData {
   finalNotes: string;
   observedRedFlags: string[];
   photos: {
-    supplier?: string;
-    cropSample?: string;
-    plantation?: string;
-    landTitle?: string;
-    roadAccess?: string;
+    supplier?: UploadedFile;
+    cropSample?: UploadedFile;
+    plantation?: UploadedFile;
+    landTitle?: UploadedFile;
+    roadAccess?: UploadedFile;
   };
   recommendedFollowUp: 'Do not follow up' | 'Require verification' | 'Do not engage' | '';
   followUpReason: string;
@@ -118,10 +182,23 @@ interface SupplierFormData {
   supplierSignature: string;
   dateVerified: string;
 
-  // Account credentials
+  // Digital Consent and OTP
   consentGiven: boolean;
   consentTimestamp: string;
   tncVersion: string;
+  otpCode: string;
+  userEnteredOtp: string;
+  otpRequested: boolean;
+  otpVerified: boolean;
+  ipAddress: string;
+  verificationTimestamp: string;
+
+  // Additional Documents
+  ownershipDocument?: File;
+  proofPhotos: {
+    ownership?: UploadedFile;
+    additional?: UploadedFile[];
+  };
 }
 
 const SupplierRegistrationForm: React.FC = () => {
@@ -238,10 +315,23 @@ const SupplierRegistrationForm: React.FC = () => {
     supplierSignature: '',
     dateVerified: new Date().toISOString().split('T')[0],
 
-    // Account credentials
+    // Digital Consent and OTP
     consentGiven: false,
     consentTimestamp: '',
-    tncVersion: '1.0'
+    tncVersion: '1.0',
+    otpCode: '',
+    userEnteredOtp: '',
+    otpRequested: false,
+    otpVerified: false,
+    ipAddress: '',
+    verificationTimestamp: '',
+
+    // Additional Documents
+    ownershipDocument: undefined,
+    proofPhotos: {
+      ownership: undefined,
+      additional: []
+    }
   });
 
   // Account credentials
@@ -274,6 +364,209 @@ const SupplierRegistrationForm: React.FC = () => {
       ...prev,
       [field]: value
     }));
+  };
+
+  // File upload functions
+  const validateFile = (file: File): string | null => {
+    // Check file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      return 'Only JPG, PNG, and WebP files are allowed';
+    }
+
+    // Check file size (10MB)
+    const maxSize = 10 * 1024 * 1024; // 10MB in bytes
+    if (file.size > maxSize) {
+      return 'File size must be less than 10MB';
+    }
+
+    return null;
+  };
+
+  const handleFileUpload = async (photoType: keyof SupplierFormData['photos'], file: File) => {
+    const error = validateFile(file);
+    if (error) {
+      setErrors(prev => ({ ...prev, [photoType]: error }));
+      return;
+    }
+
+    try {
+      // Create preview
+      const preview = URL.createObjectURL(file);
+
+      // Process the image with high quality preservation
+      const processedFile = await processImage(file);
+
+      // Create uploaded file object
+      const uploadedFile: UploadedFile = {
+        file,
+        preview,
+        compressedFile: processedFile
+      };
+
+      // Update form data
+      setFormData(prev => ({
+        ...prev,
+        photos: {
+          ...prev.photos,
+          [photoType]: uploadedFile
+        }
+      }));
+
+      // Clear any existing errors for this photo type
+      if (errors[photoType]) {
+        setErrors(prev => ({ ...prev, [photoType]: '' }));
+      }
+    } catch (error) {
+      setErrors(prev => ({ ...prev, [photoType]: 'Failed to process image' }));
+    }
+  };
+
+  const removePhoto = (photoType: keyof SupplierFormData['photos']) => {
+    setFormData(prev => {
+      const updatedPhotos = { ...prev.photos };
+      if (updatedPhotos[photoType]?.preview) {
+        URL.revokeObjectURL(updatedPhotos[photoType].preview);
+      }
+      delete updatedPhotos[photoType];
+      return {
+        ...prev,
+        photos: updatedPhotos
+      };
+    });
+
+    // Clear any errors for this photo type
+    if (errors[photoType]) {
+      setErrors(prev => ({ ...prev, [photoType]: '' }));
+    }
+  };
+
+  const handleFileChange = (photoType: keyof SupplierFormData['photos']) => (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleFileUpload(photoType, file);
+    }
+    // Reset input value to allow uploading the same file again if removed
+    e.target.value = '';
+  };
+
+  // Proof photo functions
+  const handleProofPhotoUpload = async (file: File) => {
+    const error = validateFile(file);
+    if (error) {
+      setErrors(prev => ({ ...prev, proofPhoto: error }));
+      return;
+    }
+
+    try {
+      // Create preview
+      const preview = URL.createObjectURL(file);
+
+      // Process the image with high quality preservation
+      const processedFile = await processImage(file);
+
+      // Create uploaded file object
+      const uploadedFile: UploadedFile = {
+        file,
+        preview,
+        compressedFile: processedFile
+      };
+
+      // Update form data
+      setFormData(prev => ({
+        ...prev,
+        proofPhotos: {
+          ...prev.proofPhotos,
+          ownership: uploadedFile
+        }
+      }));
+
+      // Clear any existing errors
+      if (errors.proofPhoto) {
+        setErrors(prev => ({ ...prev, proofPhoto: '' }));
+      }
+    } catch (error) {
+      setErrors(prev => ({ ...prev, proofPhoto: 'Failed to process photo' }));
+    }
+  };
+
+  const removeProofPhoto = () => {
+    setFormData(prev => {
+      const updatedProofPhotos = { ...prev.proofPhotos };
+      if (updatedProofPhotos.ownership?.preview) {
+        URL.revokeObjectURL(updatedProofPhotos.ownership.preview);
+      }
+      updatedProofPhotos.ownership = undefined;
+      return {
+        ...prev,
+        proofPhotos: updatedProofPhotos
+      };
+    });
+
+    // Clear any errors
+    if (errors.proofPhoto) {
+      setErrors(prev => ({ ...prev, proofPhoto: '' }));
+    }
+  };
+
+  // OTP functions
+  const generateOTP = () => {
+    // Generate 6-digit OTP
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  };
+
+  const getClientIP = async () => {
+    try {
+      // For development/testing, we'll use a mock IP
+      // In production, you could use a service like https://api.ipify.org or your backend
+      const mockIP = '192.168.' + Math.floor(Math.random() * 255) + '.' + Math.floor(Math.random() * 255);
+      return mockIP;
+    } catch (error) {
+      return 'Unknown';
+    }
+  };
+
+  const requestOTP = async () => {
+    const otp = generateOTP();
+    const phoneNumber = formData.phoneNumber;
+
+    // Generate client IP
+    const ipAddress = await getClientIP();
+
+    // Update form with OTP data
+    setFormData(prev => ({
+      ...prev,
+      otpCode: otp,
+      otpRequested: true,
+      ipAddress: ipAddress,
+      verificationTimestamp: new Date().toISOString()
+    }));
+
+    // Show the OTP to user (mock SMS service)
+    alert(`🔐 Your OTP Verification Code\n\nCode: ${otp}\n\nThis would be sent to: ${phoneNumber}\nYour IP: ${ipAddress}`);
+  };
+
+  const verifyOTP = () => {
+    if (formData.userEnteredOtp === formData.otpCode) {
+      setFormData(prev => ({
+        ...prev,
+        otpVerified: true
+      }));
+      setErrors(prev => ({ ...prev, otp: '' }));
+    } else {
+      setErrors(prev => ({ ...prev, otp: 'Invalid OTP. Please try again.' }));
+    }
+  };
+
+  const clearOTP = () => {
+    setFormData(prev => ({
+      ...prev,
+      otpCode: '',
+      userEnteredOtp: '',
+      otpRequested: false,
+      otpVerified: false
+    }));
+    setErrors(prev => ({ ...prev, otp: '' }));
   };
 
   const addPlot = () => {
@@ -348,8 +641,8 @@ const SupplierRegistrationForm: React.FC = () => {
         if (!formData.consentGiven) {
           newErrors.consent = 'You must agree to the Terms and Conditions to proceed';
         }
-        if (!formData.declaration) {
-          newErrors.declaration = 'You must agree to the declaration to submit';
+        if (!formData.otpVerified) {
+          newErrors.otp = 'You must complete OTP verification to submit';
         }
         break;
     }
@@ -370,6 +663,147 @@ const SupplierRegistrationForm: React.FC = () => {
 
   const prevStep = () => {
     setCurrentStep(prev => Math.max(prev - 1, 1));
+  };
+
+  const resetForm = () => {
+    // Clean up any existing preview URLs
+    Object.values(formData.photos).forEach(photo => {
+      if (photo?.preview) {
+        URL.revokeObjectURL(photo.preview);
+      }
+    });
+
+    // Clean up proof photos
+    if (formData.proofPhotos.ownership?.preview) {
+      URL.revokeObjectURL(formData.proofPhotos.ownership.preview);
+    }
+    formData.proofPhotos.additional?.forEach(photo => {
+      if (photo?.preview) {
+        URL.revokeObjectURL(photo.preview);
+      }
+    });
+
+    const newId = generateSupplierId();
+    setCredentials({
+      uniqueSupplierId: newId,
+      email: '',
+      password: '',
+      confirmPassword: ''
+    });
+    setFormData({
+      // Basic Information
+      formId: '',
+      uniqueSupplierId: newId,
+      surveyDate: new Date().toISOString().split('T')[0],
+      supplierName: '',
+      contactPerson: '',
+      phoneNumber: '',
+      email: '',
+      plantationAddress: '',
+      gpsCoordinate: '',
+      primaryProduct: '',
+      type: 'supplier',
+
+      // Land Status and Legality
+      ownershipType: '',
+      proofOfOwnership: [],
+      certificateNumber: '',
+      legalStatusOfLand: '',
+      currentBuyer: '',
+
+      // EUDR Compliance
+      hasDeforestation: 'unknown',
+      evidenceOfNoDeforestation: '',
+      legalityChecklist: [],
+      proximityToCommunities: '',
+      knownLandConflicts: '',
+      harvestDateStart: '',
+      harvestDateEnd: '',
+      firstPointOfSale: '',
+      plots: [{ id: '1', identifier: 'Plot 1', size: 0, gpsCoordinates: '' }],
+
+      // ISCC Self Assessment
+      isccLandUse: '',
+      previousLandUse: [],
+      environmentalPractices: [],
+      healthSafetyChecklist: [],
+      workerRights: [],
+      grievanceMechanism: '',
+      freedomOfAssociation: '',
+      recordKeeping: [],
+      gapTraining: 'no',
+
+      // Plantation Profile
+      mainCropType: '',
+      plantingYear: 0,
+      ageOfTrees: 0,
+      totalLandSize: 0,
+      estimatedYield: 0,
+      soilType: '',
+      topography: '',
+      farmingSystem: '',
+
+      // Labor
+      laborType: [],
+      numberWorkersPermanent: 0,
+      numberWorkersSeasonal: 0,
+
+      // Access and Logistics
+      roadCondition: '',
+      distanceToMarket: 0,
+      accessCategory: '',
+
+      // Farming Practices & Costs
+      waterSource: '',
+      pestControlMethod: '',
+      quantitySpecs: '',
+      fertilizerUse: '',
+      fertilizerType: '',
+      fertilizerDetails: '',
+      fertilizerMonths: [],
+      costFertilizer: 0,
+      costLabor: 0,
+      costTransport: 0,
+
+      // Seasonality
+      peakSeasonStart: '',
+      peakSeasonEnd: '',
+      seedCollectionStart: '',
+      seedCollectionEnd: '',
+      fruitDevelopmentStart: '',
+      fruitDevelopmentEnd: '',
+
+      // Review and Submit
+      finalNotes: '',
+      observedRedFlags: [],
+      photos: {},
+      recommendedFollowUp: '',
+      followUpReason: '',
+      declaration: false,
+      surveyorSignature: '',
+      supplierSignature: '',
+      dateVerified: new Date().toISOString().split('T')[0],
+
+      // Digital Consent and OTP
+      consentGiven: false,
+      consentTimestamp: '',
+      tncVersion: '1.0',
+      otpCode: '',
+      userEnteredOtp: '',
+      otpRequested: false,
+      otpVerified: false,
+      ipAddress: '',
+      verificationTimestamp: '',
+
+      // Additional Documents
+      ownershipDocument: undefined,
+      proofPhotos: {
+        ownership: undefined,
+        additional: []
+      }
+    });
+    setErrors({});
+    setCurrentStep(1);
   };
 
   const goToStep = (step: number) => {
@@ -454,25 +888,13 @@ const SupplierRegistrationForm: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="uniqueSupplierId">Unique Supplier ID</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="uniqueSupplierId"
-                      value={credentials.uniqueSupplierId}
-                      readOnly
-                      className="bg-gray-50 border-gray-300 text-gray-700 flex-1"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        const newId = generateSupplierId();
-                        setCredentials(prev => ({ ...prev, uniqueSupplierId: newId }));
-                      }}
-                    >
-                      Regenerate
-                    </Button>
-                  </div>
+                  <Input
+                    id="uniqueSupplierId"
+                    value={credentials.uniqueSupplierId}
+                    readOnly
+                    className="bg-gray-50 border-gray-300 text-gray-700"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">System-generated identifier</p>
                 </div>
 
                 <div>
@@ -717,14 +1139,83 @@ const SupplierRegistrationForm: React.FC = () => {
               </div>
 
               <div>
-                <Label className="text-sm font-medium text-gray-700">Upload Proof of Ownership Documents</Label>
-                <div className="mt-2 border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
-                  <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                  <p className="text-sm text-gray-600">Click to upload or drag and drop</p>
-                  <p className="text-xs text-gray-500">PDF files only (MAX. 10MB)</p>
-                  <Button type="button" variant="outline" size="sm" className="mt-2">
-                    Choose File
-                  </Button>
+                <Label className="text-base font-medium">Proof of Ownership Photos</Label>
+                <p className="text-sm text-gray-600 mb-4">Upload high-quality photos of your land ownership documents</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {[
+                    { key: 'ownership', label: 'Ownership Document' }
+                  ].map((photo) => (
+                    <div key={photo.key} className="border rounded-lg p-4">
+                      <Label className="text-sm font-medium">{photo.label}</Label>
+
+                      {formData.proofPhotos[photo.key as keyof typeof formData.proofPhotos] ? (
+                        // Show uploaded file preview
+                        <div className="mt-2">
+                          <div className="relative group">
+                            <img
+                              src={formData.proofPhotos[photo.key as keyof typeof formData.proofPhotos]?.preview}
+                              alt={photo.label}
+                              className="w-full h-32 object-cover rounded-lg border"
+                            />
+                            <button
+                              type="button"
+                              onClick={removeProofPhoto}
+                              className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                          <p className="text-xs text-gray-600 mt-1 truncate">
+                            {formData.proofPhotos[photo.key as keyof typeof formData.proofPhotos]?.compressedFile?.name || 'File processed'}
+                          </p>
+                          <p className="text-xs text-green-600">
+                            {(formData.proofPhotos[photo.key as keyof typeof formData.proofPhotos]?.compressedFile?.size || 0) < 1024
+                              ? `${Math.round((formData.proofPhotos[photo.key as keyof typeof formData.proofPhotos]?.compressedFile?.size || 0))} bytes`
+                              : `${Math.round(((formData.proofPhotos[photo.key as keyof typeof formData.proofPhotos]?.compressedFile?.size || 0)) / 1024)} KB`
+                            } (high quality)
+                          </p>
+                        </div>
+                      ) : (
+                        // Show upload prompt
+                        <div className="mt-2">
+                          <input
+                            type="file"
+                            id={`proof-upload-${photo.key}`}
+                            accept="image/jpeg,image/jpg,image/png,image/webp"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                handleProofPhotoUpload(file);
+                              }
+                              // Reset input value
+                              e.target.value = '';
+                            }}
+                            className="hidden"
+                          />
+                          <label
+                            htmlFor={`proof-upload-${photo.key}`}
+                            className="cursor-pointer"
+                          >
+                            <div className="border-2 border-dashed border-gray-300 rounded p-3 text-center hover:border-gray-400 transition-colors">
+                              <Camera className="w-6 h-6 text-gray-400 mx-auto mb-1" />
+                              <p className="text-xs text-gray-500">Click to upload</p>
+                              <p className="text-xs text-gray-400 mt-1">JPG, PNG, WebP (max 10MB)</p>
+                            </div>
+                          </label>
+                        </div>
+                      )}
+
+                      {errors.proofPhoto && (
+                        <p className="text-red-500 text-xs mt-1">{errors.proofPhoto}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
+                  <p className="text-xs text-blue-700">
+                    💡 <strong>High Quality Tips:</strong> Take photos in good lighting with the entire document visible. Ensure text is readable for verification purposes.
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -1399,13 +1890,60 @@ const SupplierRegistrationForm: React.FC = () => {
                   ].map((photo) => (
                     <div key={photo.key} className="border rounded-lg p-4">
                       <Label className="text-sm font-medium">{photo.label}</Label>
-                      <div className="mt-2 border-2 border-dashed border-gray-300 rounded p-3 text-center">
-                        <Camera className="w-6 h-6 text-gray-400 mx-auto mb-1" />
-                        <p className="text-xs text-gray-500">Click to upload</p>
-                        <Button type="button" variant="outline" size="sm" className="mt-1 text-xs">
-                          Choose File
-                        </Button>
-                      </div>
+
+                      {formData.photos[photo.key as keyof SupplierFormData['photos']] ? (
+                        // Show uploaded file preview
+                        <div className="mt-2">
+                          <div className="relative group">
+                            <img
+                              src={formData.photos[photo.key as keyof SupplierFormData['photos']]?.preview}
+                              alt={photo.label}
+                              className="w-full h-32 object-cover rounded-lg border"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removePhoto(photo.key as keyof SupplierFormData['photos'])}
+                              className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                          <p className="text-xs text-gray-600 mt-1 truncate">
+                            {formData.photos[photo.key as keyof SupplierFormData['photos']]?.compressedFile?.name || 'File processed'}
+                          </p>
+                          <p className="text-xs text-green-600">
+                            {(formData.photos[photo.key as keyof SupplierFormData['photos']]?.compressedFile?.size || 0) < 1024
+                              ? `${Math.round((formData.photos[photo.key as keyof SupplierFormData['photos']]?.compressedFile?.size || 0))} bytes`
+                              : `${Math.round(((formData.photos[photo.key as keyof SupplierFormData['photos']]?.compressedFile?.size || 0)) / 1024)} KB`
+                            } (optimized)
+                          </p>
+                        </div>
+                      ) : (
+                        // Show upload prompt
+                        <div className="mt-2">
+                          <input
+                            type="file"
+                            id={`file-upload-${photo.key}`}
+                            accept="image/jpeg,image/jpg,image/png,image/webp"
+                            onChange={handleFileChange(photo.key as keyof SupplierFormData['photos'])}
+                            className="hidden"
+                          />
+                          <label
+                            htmlFor={`file-upload-${photo.key}`}
+                            className="cursor-pointer"
+                          >
+                            <div className="border-2 border-dashed border-gray-300 rounded p-3 text-center hover:border-gray-400 transition-colors">
+                              <Camera className="w-6 h-6 text-gray-400 mx-auto mb-1" />
+                              <p className="text-xs text-gray-500">Click to upload</p>
+                              <p className="text-xs text-gray-400 mt-1">JPG, PNG, WebP (max 10MB)</p>
+                            </div>
+                          </label>
+                        </div>
+                      )}
+
+                      {errors[photo.key] && (
+                        <p className="text-red-500 text-xs mt-1">{errors[photo.key]}</p>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1439,9 +1977,9 @@ const SupplierRegistrationForm: React.FC = () => {
               )}
 
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-                <h3 className="font-semibold mb-4 text-blue-900">Terms and Conditions</h3>
+                <h3 className="font-semibold mb-4 text-blue-900">Digital Consent and Verification</h3>
 
-                <div className="mb-4">
+                <div className="mb-6">
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <button type="button" className="text-primary-600 hover:text-primary-800 underline text-sm font-medium">
@@ -1450,7 +1988,30 @@ const SupplierRegistrationForm: React.FC = () => {
                     </AlertDialogTrigger>
                     <AlertDialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
                       <AlertDialogHeader>
-                        <AlertDialogTitle>Genco Supplier Data - Terms and Conditions</AlertDialogTitle>
+                        <div className="flex items-center justify-between">
+                          <AlertDialogTitle>Genco Supplier Data - Terms and Conditions</AlertDialogTitle>
+                          <AlertDialogTrigger asChild>
+                            <button
+                              type="button"
+                              className="rounded-full p-1 hover:bg-gray-100 transition-colors"
+                              aria-label="Close"
+                            >
+                              <svg
+                                className="h-6 w-6 text-gray-500 hover:text-gray-700"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M6 18L18 6M6 6l12 12"
+                                />
+                              </svg>
+                            </button>
+                          </AlertDialogTrigger>
+                        </div>
                         <AlertDialogDescription>
                           <div className="text-left space-y-4 text-sm">
                             <div className="flex justify-between items-center mb-4 pb-2 border-b">
@@ -1531,6 +2092,23 @@ const SupplierRegistrationForm: React.FC = () => {
                   </AlertDialog>
                 </div>
 
+                <div className="bg-white border border-blue-300 rounded-lg p-4 mb-4">
+                  <h4 className="font-semibold text-sm text-blue-900 mb-3">Digital Agreement Details</h4>
+                  <p className="text-sm text-gray-700 mb-4">
+                    By checking the box below and completing the verification process, you confirm the following:
+                  </p>
+                  <ul className="text-sm text-gray-700 space-y-1 list-disc pl-5 mb-4">
+                    <li>You have read, understood, and agree to the <strong>Genco Supplier Data Terms and Conditions</strong>.</li>
+                    <li>You certify that you are authorized to provide this information on behalf of the supplier/plantation.</li>
+                    <li>You declare that all information provided is true, accurate, and complete to the best of your knowledge.</li>
+                  </ul>
+                  <p className="text-xs text-gray-600 bg-gray-50 p-3 rounded">
+                    Your agreement will be recorded digitally. For verification purposes, we will capture your <strong>IP Address</strong>,
+                    the <strong>Date and Time</strong> of submission, and validate your identity by sending a <strong>One-Time Password (OTP)</strong>
+                    to the provided phone number. This digital record will serve as your binding confirmation.
+                  </p>
+                </div>
+
                 <div className="space-y-4">
                   <label className="flex items-start space-x-3 cursor-pointer">
                     <input
@@ -1548,58 +2126,110 @@ const SupplierRegistrationForm: React.FC = () => {
                   {errors.consent && (
                     <p className="text-red-600 text-sm mt-1">{errors.consent}</p>
                   )}
+                </div>
+              </div>
 
-                  <label className="flex items-start space-x-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.declaration}
-                      onChange={(e) => updateFormData('declaration', e.target.checked)}
-                      className="mt-1 h-4 w-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                    />
-                    <span className="text-sm text-blue-800">
-                      I, the undersigned, declare that the information provided in this supplier and plantation survey form is true,
-                      accurate, and complete to the best of my knowledge and belief.
-                    </span>
-                  </label>
-                  {errors.declaration && (
-                    <p className="text-red-600 text-sm mt-1">{errors.declaration}</p>
+              {/* OTP Verification Section */}
+              {formData.consentGiven && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+                  <h3 className="font-semibold mb-4 text-green-900">🔐 OTP Verification</h3>
+
+                  {!formData.otpRequested ? (
+                    // Request OTP
+                    <div>
+                      <p className="text-sm text-gray-700 mb-4">
+                        We need to verify your identity before submission. A One-Time Password (OTP) will be sent to:
+                      </p>
+                      <div className="bg-white p-3 rounded border mb-4">
+                        <p className="font-medium">{formData.phoneNumber}</p>
+                        <p className="text-xs text-gray-500">Phone number on record</p>
+                      </div>
+                      <Button
+                        type="button"
+                        onClick={requestOTP}
+                        disabled={!formData.phoneNumber}
+                        className="w-full md:w-auto"
+                      >
+                        <Upload className="w-4 h-4 mr-2" />
+                        Send OTP Code
+                      </Button>
+                    </div>
+                  ) : !formData.otpVerified ? (
+                    // Verify OTP
+                    <div>
+                      <p className="text-sm text-gray-700 mb-4">
+                        Enter the 6-digit OTP code that was sent to your phone:
+                      </p>
+                      <div className="flex gap-3 mb-4">
+                        <Input
+                          type="text"
+                          maxLength={6}
+                          placeholder="000000"
+                          value={formData.userEnteredOtp}
+                          onChange={(e) => updateFormData('userEnteredOtp', e.target.value)}
+                          className="text-center text-lg font-mono"
+                        />
+                        <Button
+                          type="button"
+                          onClick={verifyOTP}
+                          disabled={formData.userEnteredOtp.length !== 6}
+                        >
+                          Verify OTP
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={clearOTP}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                      {errors.otp && (
+                        <p className="text-red-600 text-sm mb-4">{errors.otp}</p>
+                      )}
+                      <div className="bg-yellow-50 border border-yellow-200 p-3 rounded">
+                        <p className="text-xs text-yellow-800">
+                          💡 For testing: The OTP was displayed in the popup message when you clicked "Send OTP Code".
+                          In production, this would be sent via SMS to your phone.
+                        </p>
+                      </div>
+                      <div className="mt-4">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={requestOTP}
+                          className="text-xs"
+                        >
+                          Resend OTP
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    // OTP Verified
+                    <div className="bg-green-100 border border-green-300 p-4 rounded">
+                      <div className="flex items-center gap-2 mb-2">
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                        <p className="font-medium text-green-800">✅ Verification Successful</p>
+                      </div>
+                      <div className="text-sm text-green-700 space-y-1">
+                        <p><strong>Phone Verified:</strong> {formData.phoneNumber}</p>
+                        <p><strong>IP Address:</strong> {formData.ipAddress}</p>
+                        <p><strong>Verification Time:</strong> {new Date(formData.verificationTimestamp).toLocaleString()}</p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={clearOTP}
+                        className="mt-3"
+                      >
+                        Reset Verification
+                      </Button>
+                    </div>
                   )}
                 </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="surveyorSignature">Surveyor Signature and Name</Label>
-                  <Textarea
-                    id="surveyorSignature"
-                    value={formData.surveyorSignature}
-                    onChange={(e) => updateFormData('surveyorSignature', e.target.value)}
-                    placeholder="Enter surveyor name and signature"
-                    rows={2}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="supplierSignature">Supplier Signature and Name</Label>
-                  <Textarea
-                    id="supplierSignature"
-                    value={formData.supplierSignature}
-                    onChange={(e) => updateFormData('supplierSignature', e.target.value)}
-                    placeholder="Enter supplier name and signature"
-                    rows={2}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="dateVerified">Date Verified</Label>
-                <Input
-                  id="dateVerified"
-                  type="date"
-                  value={formData.dateVerified}
-                  onChange={(e) => updateFormData('dateVerified', e.target.value)}
-                />
-              </div>
+              )}
             </CardContent>
           </Card>
         );
@@ -1614,16 +2244,25 @@ const SupplierRegistrationForm: React.FC = () => {
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="mb-6">
-          <div className="flex items-center gap-3 mb-2">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                onClick={() => currentStep > 1 && prevStep()}
+                disabled={currentStep === 1}
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back
+              </Button>
+              <h1 className="text-2xl font-bold text-gray-900">Supplier Registration</h1>
+            </div>
             <Button
               variant="outline"
-              onClick={() => currentStep > 1 && prevStep()}
-              disabled={currentStep === 1}
+              onClick={resetForm}
+              className="text-red-600 border-red-200 hover:bg-red-50"
             >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back
+              Reset Form
             </Button>
-            <h1 className="text-2xl font-bold text-gray-900">Supplier Registration</h1>
           </div>
 
           {/* Progress Bar */}
