@@ -1,11 +1,8 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
-import Login from './pages/Login';
-import Landing from './pages/Landing';
-import SupplierRegistrationForm from './pages/SupplierRegistrationForm';
-import SupplierSuccessPage from './pages/SupplierSuccessPage';
-import SupplierDashboard from './pages/SupplierDashboard';
+import { AuthProvider, useAuth } from './features/auth';
+import { Login, Landing } from './features/auth';
+import { SupplierRegistrationForm, SupplierSuccessPage, SupplierDashboard } from './features/suppliers';
 
 // Import environment configuration
 import { config } from './config/env';

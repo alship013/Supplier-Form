@@ -9,7 +9,20 @@
       "Bash(npm run dev:*)",
       "Bash(curl:*)",
       "Bash(git remote set-url:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(tree:*)",
+      "Bash(find:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(tasklist:*)",
+      "Bash(nul)",
+      "Bash(wmic:*)",
+      "Bash(dir:*)",
+      "Bash(pkill:*)",
+      "Bash(taskkill:*)",
+      "Bash(npm uninstall:*)"
     ],
     "deny": [],
     "ask": []
