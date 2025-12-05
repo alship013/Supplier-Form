@@ -4,7 +4,7 @@ import { useAuth } from '../../auth/services/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../shared/components/ui/card';
 import { Button } from '../../shared/components/ui/button';
 import { Badge } from '../../shared/components/ui/badge';
-import { Users, FileText, MapPin, Calendar, LogOut, Edit, Eye } from 'lucide-react';
+import { Users, FileText, MapPin, LogOut, Edit } from 'lucide-react';
 
 const SupplierDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -12,9 +12,36 @@ const SupplierDashboard: React.FC = () => {
   const [supplierData, setSupplierData] = useState<any>(null);
 
   useEffect(() => {
-    // Load supplier data from localStorage
-    const suppliers = JSON.parse(localStorage.getItem('vsts_suppliers') || '[]');
-    const currentSupplier = suppliers.find((s: any) => s.id === user?.id);
+    // Load supplier data from localStorage or use mock data for testing
+    let suppliers = JSON.parse(localStorage.getItem('vsts_suppliers') || '[]');
+    let currentSupplier = suppliers.find((s: any) => s.id === user?.id);
+
+    // If no supplier data found, create mock data for the admin user
+    if (!currentSupplier && user?.role === 'admin') {
+      currentSupplier = {
+        id: user.id,
+        supplierName: 'Demo Supplier Company',
+        contactPerson: 'John Doe',
+        email: 'admin@vsts.com',
+        phoneNumber: '+1234567890',
+        plantationAddress: '123 Demo Street, Demo City',
+        gpsCoordinate: '-6.2088, 106.8456',
+        status: 'approved',
+        totalLandSize: 25,
+        plots: [
+          { id: '1', identifier: 'Plot 1', size: 15 },
+          { id: '2', identifier: 'Plot 2', size: 10 }
+        ],
+        type: 'supplier',
+        product: 'Rubber Seed',
+        createdAt: new Date().toISOString()
+      };
+
+      // Save mock data to localStorage
+      suppliers.push(currentSupplier);
+      localStorage.setItem('vsts_suppliers', JSON.stringify(suppliers));
+    }
+
     setSupplierData(currentSupplier);
   }, [user]);
 
@@ -115,16 +142,11 @@ const SupplierDashboard: React.FC = () => {
         {/* Quick Actions */}
         <div className="mb-8">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card className="hover:shadow-md transition-shadow cursor-pointer">
-              <CardContent className="p-6 text-center">
-                <Eye className="h-8 w-8 text-primary-600 mx-auto mb-3" />
-                <h3 className="font-medium">View Profile</h3>
-                <p className="text-sm text-gray-600 mt-1">See your complete information</p>
-              </CardContent>
-            </Card>
-
-            <Card className="hover:shadow-md transition-shadow cursor-pointer">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <Card
+              className="hover:shadow-md transition-shadow cursor-pointer"
+              onClick={() => navigate('/edit-profile')}
+            >
               <CardContent className="p-6 text-center">
                 <Edit className="h-8 w-8 text-primary-600 mx-auto mb-3" />
                 <h3 className="font-medium">Edit Profile</h3>
@@ -132,7 +154,10 @@ const SupplierDashboard: React.FC = () => {
               </CardContent>
             </Card>
 
-            <Card className="hover:shadow-md transition-shadow cursor-pointer">
+            <Card
+              className="hover:shadow-md transition-shadow cursor-pointer"
+              onClick={() => navigate('/documents')}
+            >
               <CardContent className="p-6 text-center">
                 <FileText className="h-8 w-8 text-primary-600 mx-auto mb-3" />
                 <h3 className="font-medium">Documents</h3>
@@ -140,7 +165,10 @@ const SupplierDashboard: React.FC = () => {
               </CardContent>
             </Card>
 
-            <Card className="hover:shadow-md transition-shadow cursor-pointer">
+            <Card
+              className="hover:shadow-md transition-shadow cursor-pointer"
+              onClick={() => navigate('/map-view')}
+            >
               <CardContent className="p-6 text-center">
                 <MapPin className="h-8 w-8 text-primary-600 mx-auto mb-3" />
                 <h3 className="font-medium">Map View</h3>
@@ -150,37 +178,125 @@ const SupplierDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Contact Information */}
+        {/* Profile Information */}
         <Card>
           <CardHeader>
-            <CardTitle>Contact Information</CardTitle>
+            <CardTitle>Profile Information</CardTitle>
             <CardDescription>
-              Your registered contact details
+              Your supplier registration details and contact information
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+              {/* Business Information */}
               <div>
-                <h4 className="font-medium text-gray-900 mb-3">Primary Contact</h4>
+                <h4 className="font-medium text-gray-900 mb-3">Business Information</h4>
+                <div className="space-y-2 text-sm">
+                  <div><strong>Supplier ID:</strong> {supplierData.uniqueSupplierId || user?.id}</div>
+                  <div><strong>Form ID:</strong> {supplierData.formId || 'N/A'}</div>
+                  <div><strong>Company Name:</strong> {supplierData.supplierName}</div>
+                  <div><strong>Supplier Type:</strong> {supplierData.type || 'supplier'}</div>
+                  <div><strong>Main Product:</strong> {supplierData.product || 'N/A'}</div>
+                  <div><strong>Registration Date:</strong> {supplierData.surveyDate || 'N/A'}</div>
+                  <div><strong>Status:</strong> {getStatusBadge(supplierData.status || 'pending')}</div>
+                </div>
+              </div>
+
+              {/* Contact Information */}
+              <div>
+                <h4 className="font-medium text-gray-900 mb-3">Contact Information</h4>
                 <div className="space-y-2 text-sm">
                   <div><strong>Contact Person:</strong> {supplierData.contactPerson}</div>
                   <div><strong>Email:</strong> {supplierData.email}</div>
                   <div><strong>Phone:</strong> {supplierData.phoneNumber}</div>
-                </div>
-              </div>
-              <div>
-                <h4 className="font-medium text-gray-900 mb-3">Location</h4>
-                <div className="space-y-2 text-sm">
                   <div><strong>Address:</strong> {supplierData.plantationAddress}</div>
                   {supplierData.gpsCoordinate && (
                     <div><strong>GPS:</strong> {supplierData.gpsCoordinate}</div>
                   )}
+                  {supplierData.currentBuyer && (
+                    <div><strong>Current Buyer:</strong> {supplierData.currentBuyer}</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Land Information */}
+              <div>
+                <h4 className="font-medium text-gray-900 mb-3">Land & Production</h4>
+                <div className="space-y-2 text-sm">
+                  <div><strong>Total Land Size:</strong> {supplierData.totalLandSize || 0} Ha</div>
+                  <div><strong>Number of Plots:</strong> {supplierData.plots?.length || 0}</div>
+                  <div><strong>Estimated Yield:</strong> {supplierData.estimatedYield || 0} kg/Ha</div>
+                  {supplierData.mainCropType && (
+                    <div><strong>Main Crop:</strong> {supplierData.mainCropType}</div>
+                  )}
+                  {supplierData.ownershipType && (
+                    <div><strong>Land Ownership:</strong> {supplierData.ownershipType}</div>
+                  )}
+                  {supplierData.plantingYear && (
+                    <div><strong>Planting Year:</strong> {supplierData.plantingYear}</div>
+                  )}
+                </div>
+              </div>
+
+            </div>
+
+            {/* Land Status & Compliance */}
+            <div className="mt-6 pt-6 border-t">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-3">Land Status</h4>
+                  <div className="space-y-2 text-sm">
+                    {supplierData.legalStatusOfLand && (
+                      <div><strong>Legal Status:</strong> {supplierData.legalStatusOfLand}</div>
+                    )}
+                    {supplierData.certificateNumber && (
+                      <div><strong>Certificate:</strong> {supplierData.certificateNumber}</div>
+                    )}
+                    {supplierData.proofOfOwnership && supplierData.proofOfOwnership.length > 0 && (
+                      <div><strong>Ownership Proof:</strong> {supplierData.proofOfOwnership.join(', ')}</div>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-3">Compliance</h4>
+                  <div className="space-y-2 text-sm">
+                    {supplierData.hasDeforestation && (
+                      <div><strong>Deforestation Check:</strong> {supplierData.hasDeforestation === 'no' ? '✅ Clear' : '⚠️ ' + supplierData.hasDeforestation}</div>
+                    )}
+                    {supplierData.otpVerified && (
+                      <div><strong>Verification:</strong> ✅ OTP Verified</div>
+                    )}
+                    {supplierData.consentGiven && (
+                      <div><strong>Digital Consent:</strong> ✅ Provided</div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
+
+            {/* Plot Summary */}
+            {supplierData.plots && supplierData.plots.length > 0 && (
+              <div className="mt-6 pt-6 border-t">
+                <h4 className="font-medium text-gray-900 mb-3">Plot Summary</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {supplierData.plots.map((plot: any, index: number) => (
+                    <div key={index} className="bg-gray-50 p-3 rounded-lg">
+                      <div className="font-medium text-sm">{plot.identifier}</div>
+                      <div className="text-xs text-gray-600">
+                        Size: {plot.size || 0} Ha
+                        {plot.gpsCoordinates && ` | GPS: ${plot.gpsCoordinates}`}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
-      </div>
+
+        </div>
     </div>
   );
 };

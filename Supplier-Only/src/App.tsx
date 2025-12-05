@@ -2,7 +2,14 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './features/auth';
 import { Login, Landing } from './features/auth';
-import { SupplierRegistrationForm, SupplierSuccessPage, SupplierDashboard } from './features/suppliers';
+import {
+  SupplierSurveyForm,
+  SupplierSuccessPage,
+  SupplierDashboard,
+  DocumentsPage,
+  MapViewPage,
+  EditProfilePage
+} from './features/suppliers';
 
 // Import environment configuration
 import { config } from './config/env';
@@ -39,7 +46,7 @@ function App() {
           <Route path="/login" element={<Login />} />
 
           {/* Supplier Registration - Public Route */}
-          <Route path="/supplier-register" element={<SupplierRegistrationForm />} />
+          <Route path="/supplier-register" element={<SupplierSurveyForm />} />
 
           {/* Supplier Success Page - Public Route */}
           <Route path="/supplier-success" element={<SupplierSuccessPage />} />
@@ -47,6 +54,46 @@ function App() {
           {/* Supplier Dashboard - Protected Route */}
           <Route
             path="/supplier-dashboard"
+            element={
+              <ProtectedRoute>
+                <SupplierDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Supplier Edit Profile - Protected Route */}
+          <Route
+            path="/edit-profile"
+            element={
+              <ProtectedRoute>
+                <EditProfilePage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Supplier Documents - Protected Route */}
+          <Route
+            path="/documents"
+            element={
+              <ProtectedRoute>
+                <DocumentsPage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Supplier Map View - Protected Route */}
+          <Route
+            path="/map-view"
+            element={
+              <ProtectedRoute>
+                <MapViewPage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Main Dashboard Route - Redirect to Supplier Dashboard */}
+          <Route
+            path="/dashboard"
             element={
               <ProtectedRoute>
                 <SupplierDashboard />

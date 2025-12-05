@@ -1,7 +1,8 @@
-import React, { useState, ChangeEvent, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/services/AuthContext';
-import type { UploadedFile, SupplierFormData } from '../../shared';
+import type { UploadedFile } from '../../shared';
+import type { SupplierData } from '../../shared/types/supplier';
 import {
   Card,
   CardContent,
@@ -26,7 +27,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger
 } from '../../shared';
-import { ArrowLeft, Upload, MapPin, Users, TreePine, Shield, FileText, Camera, Calendar, AlertTriangle, CheckCircle, X } from 'lucide-react';
+import { ArrowLeft, Upload, MapPin, Users, Calendar, FileText, Camera, Shield, TreePine, AlertTriangle, CheckCircle, Save, RotateCcw, X } from 'lucide-react';
 
 
 // High-quality image processing function
@@ -87,27 +88,87 @@ const processImage = (file: File): Promise<File> => {
 };
 
 
-const SupplierRegistrationForm: React.FC = () => {
+// Utility functions from Supplier-Interface
+const format = (date: Date, fmt: string) => {
+  return date.toISOString().split('T')[0]; // Simple date formatting for YYYY-MM-DD
+};
+
+const getCurrentDate = () => {
+  return new Date().toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+};
+
+const generateFormId = () => {
+  const timestamp = Date.now();
+  const random = Math.random().toString(36).substring(2, 8).toUpperCase();
+  return `FORM-${timestamp}-${random}`;
+};
+
+const generateSupplierId = () => {
+  const timestamp = Date.now().toString(36).toUpperCase();
+  const random = Math.random().toString(36).substring(2, 8).toUpperCase();
+  return `SUP-${timestamp}-${random}`;
+};
+
+// GPS Validation function
+const validateGPSCoordinates = (coord: string) => {
+  if (!coord || coord.trim() === '') {
+    return { valid: false, reason: 'empty' };
+  }
+
+  const trimmed = coord.trim();
+
+  // Reject obvious non-numeric content
+  if (trimmed.includes('photo') || trimmed.includes('image') ||
+      trimmed.includes('.jpg') || trimmed.includes('.png')) {
+    return { valid: false, reason: 'not_provided' };
+  }
+
+  // Check if it matches decimal degrees format (numbers, optional minus, decimal point)
+  const decimalDegreesRegex = /^-?\d+\.?\d*,-?\d+\.?\d*$/;
+  if (!decimalDegreesRegex.test(trimmed)) {
+    return { valid: false, reason: 'invalid_format' };
+  }
+
+  try {
+    const [latStr, lngStr] = trimmed.split(',');
+    const lat = parseFloat(latStr);
+    const lng = parseFloat(lngStr);
+
+    if (isNaN(lat) || isNaN(lng)) {
+      return { valid: false, reason: 'invalid_format' };
+    }
+
+    // Check coordinate ranges
+    if (lat < -90 || lat > 90) {
+      return { valid: false, reason: 'invalid_latitude' };
+    }
+    if (lng < -180 || lng > 180) {
+      return { valid: false, reason: 'invalid_longitude' };
+    }
+
+    return { valid: true };
+  } catch (error) {
+    return { valid: false, reason: 'invalid_format' };
+  }
+};
+
+interface SupplierSurveyFormProps {
+  supplierId?: string; // For editing existing supplier
+  onSave?: (supplier: SupplierData) => void;
+  onCancel?: () => void;
+}
+
+const SupplierSurveyForm: React.FC<SupplierSurveyFormProps> = ({ supplierId, onSave, onCancel }) => {
   const navigate = useNavigate();
   const { registerSupplier, isLoading } = useAuth();
 
-  const getCurrentDate = () => {
-    return new Date().toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
-
-  const generateSupplierId = () => {
-    const timestamp = Date.now().toString(36).toUpperCase();
-    const random = Math.random().toString(36).substring(2, 8).toUpperCase();
-    return `SUP-${timestamp}-${random}`;
-  };
-
-  // Form state with all fields
+  // Form state with all fields matching Supplier-Interface
   const [currentStep, setCurrentStep] = useState(1);
-  const [formData, setFormData] = useState<SupplierFormData>({
+  const [formData, setFormData] = useState<Partial<SupplierData>>({
     // Basic Information
     formId: '',
     uniqueSupplierId: '',
@@ -118,7 +179,7 @@ const SupplierRegistrationForm: React.FC = () => {
     email: '',
     plantationAddress: '',
     gpsCoordinate: '',
-    primaryProduct: '',
+    product: '',
     type: 'supplier',
 
     // Land Status and Legality
@@ -127,13 +188,15 @@ const SupplierRegistrationForm: React.FC = () => {
     certificateNumber: '',
     legalStatusOfLand: '',
     currentBuyer: '',
+    otherOwnershipDetails: '',
+    otherLegalStatusDetails: '',
 
     // EUDR Compliance
     hasDeforestation: 'unknown',
     evidenceOfNoDeforestation: '',
     legalityChecklist: [],
-    proximityToCommunities: '',
-    knownLandConflicts: '',
+    proximityToIndigenous: '',
+    landConflicts: '',
     harvestDateStart: '',
     harvestDateEnd: '',
     firstPointOfSale: '',
@@ -162,12 +225,12 @@ const SupplierRegistrationForm: React.FC = () => {
 
     // Labor
     laborType: [],
-    numberWorkersPermanent: 0,
-    numberWorkersSeasonal: 0,
+    permanentWorkers: 0,
+    seasonalWorkers: 0,
 
     // Access and Logistics
     roadCondition: '',
-    distanceToMarket: 0,
+    distance: 0,
     accessCategory: '',
 
     // Farming Practices & Costs
@@ -175,8 +238,8 @@ const SupplierRegistrationForm: React.FC = () => {
     pestControlMethod: '',
     quantitySpecs: '',
     fertilizerUse: '',
-    fertilizerType: '',
-    fertilizerDetails: '',
+    fertilizerUsageType: '',
+    fertilizerBrandDetails: '',
     fertilizerMonths: [],
     costFertilizer: 0,
     costLabor: 0,
@@ -193,13 +256,22 @@ const SupplierRegistrationForm: React.FC = () => {
     // Review and Submit
     finalNotes: '',
     observedRedFlags: [],
-    photos: {},
-    recommendedFollowUp: '',
-    followUpReason: '',
-    declaration: false,
-    surveyorSignature: '',
-    supplierSignature: '',
-    dateVerified: new Date().toISOString().split('T')[0],
+    recommendedAction: '',
+    reason: '',
+    dateVerified: '',
+
+    // Photos
+    photos: {
+      supplier: undefined,
+      cropSample: undefined,
+      plantation: undefined,
+      landTitle: undefined,
+      roadAccess: undefined,
+    },
+    proofPhotos: {
+      ownership: undefined,
+      additional: []
+    },
 
     // Digital Consent and OTP
     consentGiven: false,
@@ -212,12 +284,10 @@ const SupplierRegistrationForm: React.FC = () => {
     ipAddress: '',
     verificationTimestamp: '',
 
-    // Additional Documents
-    ownershipDocument: undefined,
-    proofPhotos: {
-      ownership: undefined,
-      additional: []
-    }
+    // Metadata
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    status: 'pending' as const
   });
 
   // Account credentials
@@ -230,7 +300,13 @@ const SupplierRegistrationForm: React.FC = () => {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const updateFormData = (field: keyof SupplierFormData, value: any) => {
+  // Auto-save functionality from Supplier-Interface
+  const [lastSaved, setLastSaved] = useState<string>('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const updateFormData = (field: keyof SupplierData, value: any) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -269,7 +345,7 @@ const SupplierRegistrationForm: React.FC = () => {
     return null;
   };
 
-  const handleFileUpload = async (photoType: keyof SupplierFormData['photos'], file: File) => {
+  const handleFileUpload = async (photoType: keyof SupplierData['photos'], file: File) => {
     const error = validateFile(file);
     if (error) {
       setErrors(prev => ({ ...prev, [photoType]: error }));
@@ -308,7 +384,7 @@ const SupplierRegistrationForm: React.FC = () => {
     }
   };
 
-  const removePhoto = (photoType: keyof SupplierFormData['photos']) => {
+  const removePhoto = (photoType: keyof SupplierData['photos']) => {
     setFormData(prev => {
       const updatedPhotos = { ...prev.photos };
       if (updatedPhotos[photoType]?.preview) {
@@ -327,7 +403,7 @@ const SupplierRegistrationForm: React.FC = () => {
     }
   };
 
-  const handleFileChange = (photoType: keyof SupplierFormData['photos']) => (e: ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (photoType: keyof SupplierData['photos']) => (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       handleFileUpload(photoType, file);
@@ -476,13 +552,57 @@ const SupplierRegistrationForm: React.FC = () => {
     updateFormData('plots', updatedPlots);
   };
 
-  const toggleCheckboxArray = (field: keyof SupplierFormData, value: string) => {
+  const toggleCheckboxArray = (field: keyof SupplierData, value: string) => {
     const currentArray = formData[field] as string[];
     const updatedArray = currentArray.includes(value)
       ? currentArray.filter(item => item !== value)
       : [...currentArray, value];
     updateFormData(field, updatedArray);
   };
+
+  // Auto-save functionality from Supplier-Interface
+  const autoSave = useCallback(async () => {
+    if (!supplierId) return; // Only auto-save for existing suppliers
+
+    try {
+      setIsSaving(true);
+      setAutoSaveStatus('saving');
+
+      // Here you would call your API service to save the data
+      // For now, we'll simulate the save
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      setAutoSaveStatus('saved');
+      setLastSaved(new Date().toLocaleString());
+
+      // Reset status after 2 seconds
+      setTimeout(() => {
+        setAutoSaveStatus('idle');
+      }, 2000);
+    } catch (error) {
+      console.error('Auto-save failed:', error);
+      setAutoSaveStatus('error');
+    } finally {
+      setIsSaving(false);
+    }
+  }, [formData, supplierId]);
+
+  // Trigger auto-save 2 seconds after data changes
+  useEffect(() => {
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+
+    autoSaveTimeoutRef.current = setTimeout(() => {
+      autoSave();
+    }, 2000);
+
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+    };
+  }, [formData, autoSave]);
 
   const validateStep = (step: number, returnErrorsOnly = false): boolean | Record<string, string> => {
     const newErrors: Record<string, string> = {};
@@ -681,12 +801,10 @@ const SupplierRegistrationForm: React.FC = () => {
       ipAddress: '',
       verificationTimestamp: '',
 
-      // Additional Documents
-      ownershipDocument: undefined,
-      proofPhotos: {
-        ownership: undefined,
-        additional: []
-      }
+      // Metadata
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      status: 'pending' as const
     });
     setErrors({});
     setCurrentStep(1);
@@ -2151,6 +2269,32 @@ const SupplierRegistrationForm: React.FC = () => {
             </Button>
           </div>
 
+          {/* Auto-save status indicator */}
+          {supplierId && (
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                {autoSaveStatus === 'saving' && (
+                  <div className="flex items-center gap-2 text-blue-600">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                    <span className="text-sm">Saving...</span>
+                  </div>
+                )}
+                {autoSaveStatus === 'saved' && (
+                  <div className="flex items-center gap-2 text-green-600">
+                    <CheckCircle className="w-4 h-4" />
+                    <span className="text-sm">Saved {lastSaved}</span>
+                  </div>
+                )}
+                {autoSaveStatus === 'error' && (
+                  <div className="flex items-center gap-2 text-red-600">
+                    <AlertTriangle className="w-4 h-4" />
+                    <span className="text-sm">Save failed</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Progress Bar */}
           <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
             <div
@@ -2260,4 +2404,4 @@ const SupplierRegistrationForm: React.FC = () => {
   );
 };
 
-export default SupplierRegistrationForm;
+export default SupplierSurveyForm;
