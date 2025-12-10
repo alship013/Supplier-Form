@@ -4,6 +4,11 @@ import { useAuth } from '../../auth/services/AuthContext';
 import type { UploadedFile } from '../../shared';
 import type { SupplierData } from '../../shared/types/supplier';
 import {
+  DataConsentModal,
+  PrivacyPolicyModal,
+  TermsOfUseModal
+} from './consents';
+import {
   Card,
   CardContent,
   CardDescription,
@@ -273,15 +278,37 @@ const SupplierSurveyForm: React.FC<SupplierSurveyFormProps> = ({ supplierId, onS
       additional: []
     },
 
-    // Digital Consent and OTP
+    // T&C Consent
     consentGiven: false,
+    dataConsent: {
+      accepted: false,
+      timestamp: '',
+      ipAddress: ''
+    },
+    privacyPolicy: {
+      accepted: false,
+      timestamp: '',
+      ipAddress: ''
+    },
+    termsOfUse: {
+      accepted: false,
+      timestamp: '',
+      ipAddress: ''
+    },
+    consentVerification: {
+      otpRequested: false,
+      otpSentAt: '',
+      otpCode: '',
+      userEnteredOtp: '',
+      verifiedAt: '',
+      ipAddress: ''
+    },
+    // Legacy fields for backward compatibility
     consentTimestamp: '',
     tncVersion: '1.0',
     otpCode: '',
-    userEnteredOtp: '',
     otpRequested: false,
     otpVerified: false,
-    ipAddress: '',
     verificationTimestamp: '',
 
     // Metadata
@@ -297,6 +324,11 @@ const SupplierSurveyForm: React.FC<SupplierSurveyFormProps> = ({ supplierId, onS
     password: '',
     confirmPassword: ''
   });
+
+  // T&C Modal states
+  const [showDataConsentModal, setShowDataConsentModal] = useState(false);
+  const [showPrivacyPolicyModal, setShowPrivacyPolicyModal] = useState(false);
+  const [showTermsOfUseModal, setShowTermsOfUseModal] = useState(false);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -326,6 +358,29 @@ const SupplierSurveyForm: React.FC<SupplierSurveyFormProps> = ({ supplierId, onS
       ...prev,
       [field]: value
     }));
+  };
+
+  // T&C Consent handlers
+  const handleDataConsentAccept = () => {
+    // Don't auto-check the checkbox - let user control it
+    setShowDataConsentModal(false);
+  };
+
+  const handlePrivacyPolicyAccept = () => {
+    // Don't auto-check the checkbox - let user control it
+    setShowPrivacyPolicyModal(false);
+  };
+
+  const handleTermsOfUseAccept = () => {
+    // Don't auto-check the checkbox - let user control it
+    setShowTermsOfUseModal(false);
+  };
+
+  // Check if all consents are accepted
+  const areAllConsentsAccepted = () => {
+    return formData.dataConsent?.accepted &&
+           formData.privacyPolicy?.accepted &&
+           formData.termsOfUse?.accepted;
   };
 
   // File upload functions
@@ -498,6 +553,15 @@ const SupplierSurveyForm: React.FC<SupplierSurveyFormProps> = ({ supplierId, onS
     // Update form with OTP data
     setFormData(prev => ({
       ...prev,
+      // New structure
+      consentVerification: {
+        ...prev.consentVerification,
+        otpRequested: true,
+        otpSentAt: new Date().toISOString(),
+        ipAddress: ipAddress,
+        otpCode: otp
+      },
+      // Legacy fields for backward compatibility
       otpCode: otp,
       otpRequested: true,
       ipAddress: ipAddress,
@@ -509,10 +573,21 @@ const SupplierSurveyForm: React.FC<SupplierSurveyFormProps> = ({ supplierId, onS
   };
 
   const verifyOTP = () => {
-    if (formData.userEnteredOtp === formData.otpCode) {
+    const enteredOtp = formData.userEnteredOtp || formData.consentVerification?.userEnteredOtp;
+    const expectedOtp = formData.otpCode || formData.consentVerification?.otpCode;
+
+    if (enteredOtp === expectedOtp) {
       setFormData(prev => ({
         ...prev,
-        otpVerified: true
+        // New structure
+        consentVerification: {
+          ...prev.consentVerification,
+          verifiedAt: new Date().toISOString(),
+          userEnteredOtp: enteredOtp
+        },
+        // Legacy fields for backward compatibility
+        otpVerified: true,
+        userEnteredOtp: enteredOtp
       }));
       setErrors(prev => ({ ...prev, otp: '' }));
     } else {
@@ -523,6 +598,16 @@ const SupplierSurveyForm: React.FC<SupplierSurveyFormProps> = ({ supplierId, onS
   const clearOTP = () => {
     setFormData(prev => ({
       ...prev,
+      // New structure
+      consentVerification: {
+        otpRequested: false,
+        otpSentAt: '',
+        otpCode: '',
+        userEnteredOtp: '',
+        verifiedAt: '',
+        ipAddress: ''
+      },
+      // Legacy fields for backward compatibility
       otpCode: '',
       userEnteredOtp: '',
       otpRequested: false,
@@ -644,10 +729,10 @@ const SupplierSurveyForm: React.FC<SupplierSurveyFormProps> = ({ supplierId, onS
         break;
 
       case 6: // Review and Submit
-        if (!formData.consentGiven) {
-          newErrors.consent = 'You must agree to the Terms and Conditions to proceed';
+        if (!formData.dataConsent?.accepted || !formData.privacyPolicy?.accepted || !formData.termsOfUse?.accepted) {
+          newErrors.consent = 'You must accept all three documents (Data Consent, Privacy Policy, and Terms of Use) to proceed';
         }
-        if (!formData.otpVerified) {
+        if (!formData.consentVerification?.verifiedAt) {
           newErrors.otp = 'You must complete OTP verification to submit';
         }
         break;
@@ -850,10 +935,40 @@ const SupplierSurveyForm: React.FC<SupplierSurveyFormProps> = ({ supplierId, onS
     }
 
     try {
+      // Get current IP address for consent records
+      const getCurrentIP = async () => {
+        try {
+          // In production, you might use a service to get the real IP
+          // For now, we'll use a placeholder that will be filled by the backend
+          return 'CLIENT_IP';
+        } catch (error) {
+          return 'UNKNOWN';
+        }
+      };
+
+      const currentIP = await getCurrentIP();
+
       const updatedFormData = {
         ...formData,
         formId: `FORM-${Date.now()}`,
-        consentTimestamp: new Date().toISOString()
+        consentTimestamp: new Date().toISOString(),
+        // Update consent records with IP address
+        dataConsent: {
+          ...formData.dataConsent,
+          ipAddress: currentIP
+        },
+        privacyPolicy: {
+          ...formData.privacyPolicy,
+          ipAddress: currentIP
+        },
+        termsOfUse: {
+          ...formData.termsOfUse,
+          ipAddress: currentIP
+        },
+        consentVerification: {
+          ...formData.consentVerification,
+          ipAddress: currentIP
+        }
       };
 
       const success = await registerSupplier({
@@ -2097,48 +2212,174 @@ const SupplierSurveyForm: React.FC<SupplierSurveyFormProps> = ({ supplierId, onS
                 </div>
 
                 <div className="bg-white border border-blue-300 rounded-lg p-4 mb-4">
-                  <h4 className="font-semibold text-sm text-blue-900 mb-3">Digital Agreement Details</h4>
+                  <h4 className="font-semibold text-sm text-blue-900 mb-3">Terms & Conditions Agreement</h4>
                   <p className="text-sm text-gray-700 mb-4">
-                    By checking the box below and completing the verification process, you confirm the following:
+                    Please review and accept each of the following documents to proceed:
                   </p>
-                  <ul className="text-sm text-gray-700 space-y-1 list-disc pl-5 mb-4">
-                    <li>You have read, understood, and agree to the <strong>Genco Supplier Data Terms and Conditions</strong>.</li>
-                    <li>You certify that you are authorized to provide this information on behalf of the supplier/plantation.</li>
-                    <li>You declare that all information provided is true, accurate, and complete to the best of your knowledge.</li>
-                  </ul>
-                  <p className="text-xs text-gray-600 bg-gray-50 p-3 rounded">
+                  <p className="text-xs text-gray-600 bg-blue-50 p-2 rounded mb-4">
+                    💡 <strong>Tip:</strong> Click the checkbox to check/uncheck it. Click on the document name to view the full details.
+                  </p>
+                  <p className="text-xs text-gray-600 bg-gray-50 p-3 rounded mb-4">
                     Your agreement will be recorded digitally. For verification purposes, we will capture your <strong>IP Address</strong>,
                     the <strong>Date and Time</strong> of submission, and validate your identity by sending a <strong>One-Time Password (OTP)</strong>
                     to the provided phone number. This digital record will serve as your binding confirmation.
                   </p>
                 </div>
 
-                <div className="space-y-4">
-                  <label className="flex items-start space-x-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.consentGiven}
-                      onChange={(e) => updateFormData('consentGiven', e.target.checked)}
-                      className="mt-1 h-4 w-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                    />
-                    <span className="text-sm text-blue-800">
-                      I have read, understood, and agree to the Genco Supplier Data Terms and Conditions.
-                      I certify that I am authorized to provide this information and that all information
-                      provided is true, accurate, and complete to the best of my knowledge.
-                    </span>
-                  </label>
+                <div className="space-y-3">
+                  {/* Data Consent Checkbox */}
+                  <div className="bg-gray-50 border rounded-lg p-3">
+                    <div className="flex items-start space-x-3">
+                      <input
+                        type="checkbox"
+                        id="data-consent"
+                        checked={formData.dataConsent?.accepted || false}
+                        onChange={(e) => {
+                          const timestamp = e.target.checked ? new Date().toISOString() : '';
+                          updateFormData('dataConsent', {
+                            accepted: e.target.checked,
+                            timestamp: timestamp,
+                            ipAddress: '' // Will be captured on submit
+                          });
+                        }}
+                        className="mt-1 h-4 w-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 cursor-pointer"
+                      />
+                      <div className="flex-1">
+                        <span className="text-sm font-medium text-gray-800">
+                          I accept the <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setShowDataConsentModal(true); }}
+                            className="text-blue-600 hover:text-blue-800 underline"
+                          >
+                            Specific Personal Data Consent Form
+                          </button>
+                        </span>
+                        <p className="text-xs text-gray-600 mt-1">
+                          Consent for collection of personal, land asset, and financial data
+                        </p>
+                        {formData.dataConsent?.timestamp && (
+                          <p className="text-xs text-green-600 mt-1">
+                            ✓ Accepted on {new Date(formData.dataConsent.timestamp).toLocaleString()}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Privacy Policy Checkbox */}
+                  <div className="bg-gray-50 border rounded-lg p-3">
+                    <div className="flex items-start space-x-3">
+                      <input
+                        type="checkbox"
+                        id="privacy-policy"
+                        checked={formData.privacyPolicy?.accepted || false}
+                        onChange={(e) => {
+                          const timestamp = e.target.checked ? new Date().toISOString() : '';
+                          updateFormData('privacyPolicy', {
+                            accepted: e.target.checked,
+                            timestamp: timestamp,
+                            ipAddress: '' // Will be captured on submit
+                          });
+                        }}
+                        className="mt-1 h-4 w-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 cursor-pointer"
+                      />
+                      <div className="flex-1">
+                        <span className="text-sm font-medium text-gray-800">
+                          I accept the <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setShowPrivacyPolicyModal(true); }}
+                            className="text-blue-600 hover:text-blue-800 underline"
+                          >
+                            Privacy Policy
+                          </button>
+                        </span>
+                        <p className="text-xs text-gray-600 mt-1">
+                          How we collect, use, and protect your personal data
+                        </p>
+                        {formData.privacyPolicy?.timestamp && (
+                          <p className="text-xs text-green-600 mt-1">
+                            ✓ Accepted on {new Date(formData.privacyPolicy.timestamp).toLocaleString()}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Terms of Use Checkbox */}
+                  <div className="bg-gray-50 border rounded-lg p-3">
+                    <div className="flex items-start space-x-3">
+                      <input
+                        type="checkbox"
+                        id="terms-of-use"
+                        checked={formData.termsOfUse?.accepted || false}
+                        onChange={(e) => {
+                          const timestamp = e.target.checked ? new Date().toISOString() : '';
+                          updateFormData('termsOfUse', {
+                            accepted: e.target.checked,
+                            timestamp: timestamp,
+                            ipAddress: '' // Will be captured on submit
+                          });
+                        }}
+                        className="mt-1 h-4 w-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 cursor-pointer"
+                      />
+                      <div className="flex-1">
+                        <span className="text-sm font-medium text-gray-800">
+                          I accept the <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setShowTermsOfUseModal(true); }}
+                            className="text-blue-600 hover:text-blue-800 underline"
+                          >
+                            Terms of Use (EULA)
+                          </button>
+                        </span>
+                        <p className="text-xs text-gray-600 mt-1">
+                          Terms and conditions for using the Mammoth Application
+                        </p>
+                        {formData.termsOfUse?.timestamp && (
+                          <p className="text-xs text-green-600 mt-1">
+                            ✓ Accepted on {new Date(formData.termsOfUse.timestamp).toLocaleString()}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Overall Consent Summary */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <label className="flex items-start space-x-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={areAllConsentsAccepted()}
+                        onChange={(e) => {
+                          updateFormData('consentGiven', e.target.checked);
+                          // For backward compatibility with existing validation
+                        }}
+                        disabled={!areAllConsentsAccepted()}
+                        className="mt-1 h-4 w-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 disabled:opacity-50"
+                      />
+                      <div className="flex-1">
+                        <span className="text-sm text-blue-800 font-medium">
+                          I certify that I have read and accepted all terms above
+                        </span>
+                        <p className="text-xs text-blue-600 mt-1">
+                          All three documents must be accepted to continue
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+
                   {errors.consent && (
-                    <p className="text-red-600 text-sm mt-1">{errors.consent}</p>
+                    <p className="text-red-600 text-sm mt-2">{errors.consent}</p>
                   )}
                 </div>
               </div>
 
               {/* OTP Verification Section */}
-              {formData.consentGiven && (
+              {areAllConsentsAccepted() && (
                 <div className="bg-green-50 border border-green-200 rounded-lg p-6">
                   <h3 className="font-semibold mb-4 text-green-900">🔐 OTP Verification</h3>
 
-                  {!formData.otpRequested ? (
+                  {!formData.consentVerification?.otpRequested ? (
                     // Request OTP
                     <div>
                       <p className="text-sm text-gray-700 mb-4">
@@ -2158,7 +2399,7 @@ const SupplierSurveyForm: React.FC<SupplierSurveyFormProps> = ({ supplierId, onS
                         Send OTP Code
                       </Button>
                     </div>
-                  ) : !formData.otpVerified ? (
+                  ) : !formData.consentVerification?.verifiedAt ? (
                     // Verify OTP
                     <div>
                       <p className="text-sm text-gray-700 mb-4">
@@ -2169,14 +2410,23 @@ const SupplierSurveyForm: React.FC<SupplierSurveyFormProps> = ({ supplierId, onS
                           type="text"
                           maxLength={6}
                           placeholder="000000"
-                          value={formData.userEnteredOtp}
-                          onChange={(e) => updateFormData('userEnteredOtp', e.target.value)}
+                          value={formData.userEnteredOtp || formData.consentVerification?.userEnteredOtp || ''}
+                          onChange={(e) => {
+                            updateFormData('userEnteredOtp', e.target.value);
+                            setFormData(prev => ({
+                              ...prev,
+                              consentVerification: {
+                                ...prev.consentVerification,
+                                userEnteredOtp: e.target.value
+                              }
+                            }));
+                          }}
                           className="text-center text-lg font-mono"
                         />
                         <Button
                           type="button"
                           onClick={verifyOTP}
-                          disabled={formData.userEnteredOtp.length !== 6}
+                          disabled={(formData.userEnteredOtp || formData.consentVerification?.userEnteredOtp || '').length !== 6}
                         >
                           Verify OTP
                         </Button>
@@ -2399,6 +2649,23 @@ const SupplierSurveyForm: React.FC<SupplierSurveyFormProps> = ({ supplierId, onS
             )}
           </div>
         </form>
+
+        {/* T&C Modals */}
+        <DataConsentModal
+          isOpen={showDataConsentModal}
+          onClose={() => setShowDataConsentModal(false)}
+          onAccept={handleDataConsentAccept}
+        />
+        <PrivacyPolicyModal
+          isOpen={showPrivacyPolicyModal}
+          onClose={() => setShowPrivacyPolicyModal(false)}
+          onAccept={handlePrivacyPolicyAccept}
+        />
+        <TermsOfUseModal
+          isOpen={showTermsOfUseModal}
+          onClose={() => setShowTermsOfUseModal(false)}
+          onAccept={handleTermsOfUseAccept}
+        />
       </div>
     </div>
   );

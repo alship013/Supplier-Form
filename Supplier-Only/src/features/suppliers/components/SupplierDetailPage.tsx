@@ -6,7 +6,8 @@ import { Badge } from '../../shared/components/ui/badge';
 import { Separator } from '../../shared/components/ui/separator';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../../shared/components/ui/alert-dialog';
 import { ArrowLeft, Edit, Trash2, FileSignature, MapPin, Mail, Phone, Calendar, TrendingUp, FileText, Camera, AlertTriangle, CheckCircle, Users, Globe, Shield, TreePine } from 'lucide-react';
-import { supplierDb, type SupplierData } from '../../auth/services/supplierDatabase';
+import type { SupplierData } from '../../shared/types/supplier';
+// import { supplierDb } from '../../auth/services/supplierDatabase'; // Service removed
 import { formatNumber } from '../../shared/utils/formatters';
 
 const SupplierDetailPage: React.FC = () => {
@@ -18,8 +19,10 @@ const SupplierDetailPage: React.FC = () => {
 
   useEffect(() => {
     if (id) {
-      const supplierData = supplierDb.getSupplierById(id);
-      setSupplier(supplierData);
+      // const supplierData = supplierDb.getSupplierById(id); // Service removed
+      // TODO: Implement API call to fetch supplier data
+      // setSupplier(supplierData);
+      console.log('Supplier data fetching not implemented for ID:', id);
     }
     setLoading(false);
   }, [id]);
@@ -40,7 +43,9 @@ const SupplierDetailPage: React.FC = () => {
 
   const handleDelete = () => {
     if (supplier) {
-      supplierDb.deleteSupplier(supplier.id);
+      // supplierDb.deleteSupplier(supplier.id); // Service removed
+      // TODO: Implement API call to delete supplier
+      console.log('Supplier deletion not implemented for ID:', supplier.id);
       navigate('/suppliers');
     }
   };

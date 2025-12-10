@@ -4,7 +4,7 @@ export interface User {
   username: string;
   email: string;
   fullName: string;
-  role?: 'admin' | 'staff' | 'visitor' | 'supplier';
+  role?: 'admin' | 'staff' | 'supplier';
 }
 
 export interface RegisterData {

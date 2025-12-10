@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../..
 import { Button } from '../../shared/components/ui/button';
 import { Input } from '../../shared/components/ui/input';
 import { Label } from '../../shared/components/ui/label';
-import { ArrowLeft, MapPin, Plus, Trash2, Edit2, Save, X } from 'lucide-react';
+import { ArrowLeft, MapPin, Plus, Trash2, Edit2, Save, X, Globe } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
 
 // Fix for default marker icon in React-Leaflet
@@ -61,15 +61,20 @@ const MapViewPage: React.FC = () => {
   });
 
   const cropTypes = [
-    'Rubber',
-    'Oil Palm',
-    'Coffee',
-    'Tea',
-    'Cocoa',
-    'Rice',
-    'Corn',
+    'Rubber Tree Seeds',
+    'POME',
+    'Plastic',
+    'Copra',
     'Other'
   ];
+
+  // Format number with thousands separators
+  const formatNumber = (num: number | string | null | undefined): string => {
+    if (num === null || num === undefined || num === '') return '';
+    const number = typeof num === 'string' ? parseFloat(num) : num;
+    if (isNaN(number)) return '';
+    return number.toLocaleString();
+  };
 
   useEffect(() => {
     // Load supplier data from localStorage
@@ -137,6 +142,17 @@ const MapViewPage: React.FC = () => {
     return [3.1390, 101.6869]; // Default: Kuala Lumpur
   };
 
+  // Save plots data to localStorage
+  const savePlotsToLocalStorage = (plotsData: Plot[]) => {
+    let suppliers = JSON.parse(localStorage.getItem('vsts_suppliers') || '[]');
+    const supplierIndex = suppliers.findIndex((s: any) => s.id === user?.id);
+
+    if (supplierIndex !== -1) {
+      suppliers[supplierIndex].plots = plotsData;
+      localStorage.setItem('vsts_suppliers', JSON.stringify(suppliers));
+    }
+  };
+
   const handleAddPlot = () => {
     if (!newPlot.name || !newPlot.gpsCoordinates || newPlot.landSize <= 0) {
       alert('Please fill in all required fields');
@@ -154,7 +170,9 @@ const MapViewPage: React.FC = () => {
       id: Date.now().toString()
     };
 
-    setPlots([...plots, plotToAdd]);
+    const updatedPlots = [...plots, plotToAdd];
+    setPlots(updatedPlots);
+    savePlotsToLocalStorage(updatedPlots);
     setNewPlot({
       id: '',
       name: '',
@@ -308,46 +326,73 @@ const MapViewPage: React.FC = () => {
                     </div>
 
                     <div>
-                      <Label htmlFor="new-plot-name">Plot Name *</Label>
+                      <Label htmlFor="new-plot-name">
+                        <div className="flex items-center space-x-1">
+                          <MapPin className="h-4 w-4 text-gray-500" />
+                          <span>Plot Name (required)</span>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">Give your plot a unique name for identification</p>
+                      </Label>
                       <Input
                         id="new-plot-name"
                         value={newPlot.name}
                         onChange={(e) => updateNewPlotField('name', e.target.value)}
-                        placeholder="e.g., North Field"
+                        placeholder="e.g., North Field, Orchard Block A, Paddy Field 1"
                       />
                     </div>
 
                     <div>
-                      <Label htmlFor="new-plot-gps">GPS Coordinates *</Label>
+                      <Label htmlFor="new-plot-gps">
+                        <div className="flex items-center space-x-1">
+                          <Globe className="h-4 w-4 text-gray-500" />
+                          <span>GPS Location Coordinates (required)</span>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">Enter latitude, longitude (e.g., 3.1390, 101.6869)</p>
+                      </Label>
                       <Input
                         id="new-plot-gps"
                         value={newPlot.gpsCoordinates}
                         onChange={(e) => updateNewPlotField('gpsCoordinates', e.target.value)}
-                        placeholder="e.g., 3.1390, 101.6869"
+                        placeholder="e.g., 3.1390, 101.6869 or use GPS device"
                       />
                     </div>
 
                     <div>
-                      <Label htmlFor="new-plot-size">Land Size (Ha) *</Label>
+                      <Label htmlFor="new-plot-size">
+                        <div className="flex items-center space-x-1">
+                          <svg className="h-4 w-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                          </svg>
+                          <span>Land Area Size (required)</span>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">Total area of this plot in hectares</p>
+                      </Label>
                       <Input
                         id="new-plot-size"
-                        type="number"
-                        step="0.1"
-                        value={newPlot.landSize}
-                        onChange={(e) => updateNewPlotField('landSize', parseFloat(e.target.value) || 0)}
-                        placeholder="e.g., 5.5"
+                        type="text"
+                        value={newPlot.landSize || ''}
+                        onChange={(e) => updateNewPlotField('landSize', parseFloat(e.target.value) || '')}
+                        placeholder="e.g., 2.5 (1 hectare = 10,000 m²)"
                       />
                     </div>
 
                     <div>
-                      <Label htmlFor="new-plot-crop">Main Crop Type</Label>
+                      <Label htmlFor="new-plot-crop">
+                        <div className="flex items-center space-x-1">
+                          <svg className="h-4 w-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                          </svg>
+                          <span>Main Crop Type</span>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">Primary crop cultivated on this plot</p>
+                      </Label>
                       <select
                         id="new-plot-crop"
                         value={newPlot.mainCropType}
                         onChange={(e) => updateNewPlotField('mainCropType', e.target.value)}
                         className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
                       >
-                        <option value="">Select crop type...</option>
+                        <option value="">Select main crop type...</option>
                         {cropTypes.map(type => (
                           <option key={type} value={type}>{type}</option>
                         ))}
@@ -355,13 +400,21 @@ const MapViewPage: React.FC = () => {
                     </div>
 
                     <div>
-                      <Label htmlFor="new-plot-yield">Estimated Yield (kg/Ha)</Label>
+                      <Label htmlFor="new-plot-yield">
+                        <div className="flex items-center space-x-1">
+                          <svg className="h-4 w-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                          </svg>
+                          <span>Estimated Annual Yield</span>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">Expected crop yield per hectare per year (kg)</p>
+                      </Label>
                       <Input
                         id="new-plot-yield"
-                        type="number"
-                        value={newPlot.estimatedYield}
-                        onChange={(e) => updateNewPlotField('estimatedYield', parseFloat(e.target.value) || 0)}
-                        placeholder="e.g., 1000"
+                        type="text"
+                        value={newPlot.estimatedYield || ''}
+                        onChange={(e) => updateNewPlotField('estimatedYield', parseFloat(e.target.value) || '')}
+                        placeholder="e.g., 3000 kg per hectare"
                       />
                     </div>
 
@@ -420,10 +473,9 @@ const MapViewPage: React.FC = () => {
                             />
                             <div className="grid grid-cols-2 gap-2">
                               <Input
-                                type="number"
-                                step="0.1"
-                                value={plot.landSize}
-                                onChange={(e) => updatePlotField(plot.id, 'landSize', parseFloat(e.target.value) || 0)}
+                                type="text"
+                                value={plot.landSize || ''}
+                                onChange={(e) => updatePlotField(plot.id, 'landSize', parseFloat(e.target.value) || '')}
                                 placeholder="Size (Ha)"
                               />
                               <select
@@ -438,9 +490,9 @@ const MapViewPage: React.FC = () => {
                               </select>
                             </div>
                             <Input
-                              type="number"
-                              value={plot.estimatedYield}
-                              onChange={(e) => updatePlotField(plot.id, 'estimatedYield', parseFloat(e.target.value) || 0)}
+                              type="text"
+                              value={plot.estimatedYield || ''}
+                              onChange={(e) => updatePlotField(plot.id, 'estimatedYield', parseFloat(e.target.value) || '')}
                               placeholder="Yield (kg/Ha)"
                             />
                           </div>
@@ -450,14 +502,14 @@ const MapViewPage: React.FC = () => {
                               <div>
                                 <h4 className="font-medium text-sm">{plot.name}</h4>
                                 <p className="text-xs text-gray-600 mt-1">
-                                  {plot.landSize} Ha • {plot.mainCropType || 'No crop specified'}
+                                  {formatNumber(plot.landSize)} Ha • {plot.mainCropType || 'No crop specified'}
                                 </p>
                                 <p className="text-xs text-gray-500">
                                   GPS: {plot.gpsCoordinates}
                                 </p>
                                 {plot.estimatedYield > 0 && (
                                   <p className="text-xs text-gray-500">
-                                    Yield: {plot.estimatedYield} kg/Ha
+                                    Yield: {formatNumber(plot.estimatedYield)} kg/Ha
                                   </p>
                                 )}
                               </div>

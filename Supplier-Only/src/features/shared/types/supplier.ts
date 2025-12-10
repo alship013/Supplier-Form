@@ -109,6 +109,32 @@ export interface SupplierData {
   surveyorSignature?: string;
   supplierSignature?: string;
 
+  // T&C Consent
+  consentGiven?: boolean;
+  dataConsent?: {
+    accepted: boolean;
+    timestamp?: string;
+    ipAddress?: string;
+  };
+  privacyPolicy?: {
+    accepted: boolean;
+    timestamp?: string;
+    ipAddress?: string;
+  };
+  termsOfUse?: {
+    accepted: boolean;
+    timestamp?: string;
+    ipAddress?: string;
+  };
+  consentVerification?: {
+    otpRequested?: boolean;
+    otpSentAt?: string;
+    otpCode?: string;
+    userEnteredOtp?: string;
+    verifiedAt?: string;
+    ipAddress?: string;
+  };
+
   // Metadata
   createdAt: string;
   updatedAt: string;
