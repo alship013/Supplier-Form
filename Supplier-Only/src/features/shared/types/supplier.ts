@@ -20,23 +20,26 @@ export interface SupplierData {
   email: string;
   plantationAddress: string;
   gpsCoordinate?: string;
+  product?: string; // Main product type
   type: 'supplier' | 'farmer';
-  status: 'active' | 'inactive' | 'pending';
-  dateVerified: string;
+  status: 'active' | 'inactive' | 'pending' | 'approved' | 'rejected';
+  dateVerified?: string;
 
   // Land Status and Legality
-  ownershipType?: 'Owned' | 'Rented' | 'Customary' | 'Others';
+  ownershipType?: string; // 'Owned' | 'Leased' | 'Rented' | 'Customary' | 'Other'
   proofOfOwnership?: string[]; // Array of document types
   certificateNumber?: string;
-  legalStatusOfLand?: 'Clear' | 'In Process' | 'Disputed' | 'Others';
-  currentBuyer?: 'Local' | 'Middleman' | 'Export' | 'Other';
+  legalStatusOfLand?: string; // 'Certified' | 'In Process' | 'Not Yet Certified' | 'Traditional' | 'Other'
+  currentBuyer?: string;
+  otherOwnershipDetails?: string;
+  otherLegalStatusDetails?: string;
 
   // EUDR Compliance
   hasDeforestation?: 'yes' | 'no' | 'unknown';
   evidenceOfNoDeforestation?: string;
   legalityChecklist?: string[];
-  proximityToCommunities?: 'yes' | 'no' | 'unsure';
-  knownLandConflicts?: 'yes' | 'no' | 'unsure';
+  proximityToIndigenous?: string;
+  landConflicts?: string;
   harvestDateStart?: string;
   harvestDateEnd?: string;
   firstPointOfSale?: string;
@@ -48,8 +51,8 @@ export interface SupplierData {
   environmentalPractices?: string[];
   healthSafetyChecklist?: string[];
   workerRights?: string[];
-  grievanceMechanism?: 'yes' | 'no';
-  freedomOfAssociation?: 'yes' | 'no';
+  grievanceMechanism?: string;
+  freedomOfAssociation?: string;
   recordKeeping?: string[];
   gapTraining?: string;
 
@@ -61,50 +64,54 @@ export interface SupplierData {
   estimatedYield?: number; // kg/Ha
   soilType?: string;
   topography?: string;
-  farmingSystem?: 'Monoculture' | 'Intercropped';
+  farmingSystem?: string; // 'Monoculture' | 'Intercropped' | other values
 
   // Labor
   laborType?: string[]; // Family, Hired, Local, Migrant
-  numberWorkersPermanent?: number;
-  numberWorkersSeasonal?: number;
+  permanentWorkers?: number; // Changed from numberWorkersPermanent
+  seasonalWorkers?: number; // Changed from numberWorkersSeasonal
 
   // Access and Logistics
-  roadCondition?: 'Paved' | 'Semi-paved' | 'No road' | 'Other';
-  distanceToMarket?: number; // km
-  accessCategory?: 'Easy' | 'Hard' | 'Moderate';
+  roadCondition?: string; // More options beyond the basic ones
+  distance?: number; // Changed from distanceToMarket
+  accessCategory?: string;
 
   // Farming Practices & Costs
   waterSource?: string;
   pestControlMethod?: string;
   quantitySpecs?: string;
   fertilizerUse?: string;
-  fertilizerType?: 'Chemical' | 'Organic' | 'Mix' | 'Other';
-  fertilizerDetails?: string;
+  fertilizerUsageType?: string; // Changed from fertilizerType
+  fertilizerBrandDetails?: string; // Changed from fertilizerDetails
   fertilizerMonths?: string[]; // Months of application
-  costFertilizer?: number; // IDR/year
-  costLabor?: number; // IDR/year
-  costTransport?: number; // IDR/shipment
+  costFertilizer?: number; // USD/year
+  costLabor?: number; // USD/year
+  costTransport?: number; // USD/shipment
 
   // Seasonality
-  peakSeasonStart?: string; // Month
-  peakSeasonEnd?: string; // Month
-  seedCollectionStart?: string; // Month
-  seedCollectionEnd?: string; // Month
-  fruitDevelopmentStart?: string; // Month
-  fruitDevelopmentEnd?: string; // Month
+  peakSeasonStart?: string; // Full date
+  peakSeasonEnd?: string; // Full date
+  seedCollectionStart?: string; // Full date
+  seedCollectionEnd?: string; // Full date
+  fruitDevelopmentStart?: string; // Full date
+  fruitDevelopmentEnd?: string; // Full date
 
   // Review and Submit
   finalNotes?: string;
   observedRedFlags?: string[];
   photos?: {
-    supplier?: string;
-    cropSample?: string;
-    plantation?: string;
-    landTitle?: string;
-    roadAccess?: string;
+    supplier?: File;
+    cropSample?: File;
+    plantation?: File;
+    landTitle?: File;
+    roadAccess?: File;
   };
-  recommendedFollowUp?: 'Do not follow up' | 'Require verification' | 'Do not engage';
-  followUpReason?: string;
+  proofPhotos?: {
+    ownership?: File;
+    additional: File[];
+  };
+  recommendedAction?: string; // Changed from recommendedFollowUp
+  reason?: string; // Changed from followUpReason
   declaration?: boolean;
   surveyorSignature?: string;
   supplierSignature?: string;
@@ -134,6 +141,14 @@ export interface SupplierData {
     verifiedAt?: string;
     ipAddress?: string;
   };
+
+  // Legacy fields for backward compatibility
+  consentTimestamp?: string;
+  tncVersion?: string;
+  otpCode?: string;
+  otpRequested?: boolean;
+  otpVerified?: boolean;
+  verificationTimestamp?: string;
 
   // Metadata
   createdAt: string;

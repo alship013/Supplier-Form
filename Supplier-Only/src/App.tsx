@@ -7,9 +7,9 @@ import {
   SupplierSuccessPage,
   SupplierDashboard,
   DocumentsPage,
-  MapViewPage,
-  EditProfilePage
+  MapViewPage
 } from './features/suppliers';
+import EditProfileWrapper from './features/suppliers/components/EditProfileWrapper';
 
 // Import environment configuration
 import { config } from './config/env';
@@ -66,7 +66,7 @@ function App() {
             path="/edit-profile"
             element={
               <ProtectedRoute>
-                <EditProfilePage />
+                <EditProfileWrapper />
               </ProtectedRoute>
             }
           />
